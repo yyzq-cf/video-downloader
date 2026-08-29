@@ -245,6 +245,7 @@ def run_download(task_id, url, options):
         '--extractor-args', 'generic:impersonate',
         '--newline',
         '--progress',
+        '--continue',
         '--progress-template', 'P|%(progress._percent_str)s|%(progress._total_bytes_estimate_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress.fragment_index)s|%(progress.fragment_count)s',
         '-o', str(DOWNLOAD_DIR / '%(title)s.%(ext)s'),
     ]
