@@ -10,8 +10,12 @@ services:
     volumes:
       - ./downloads:/app/downloads
       - ./templates:/app/templates
+      - ./data:/app/data
     environment:
       - PORT=5200
+      - AUTH_USERNAME=admin
+      - AUTH_PASSWORD=admin123
+      - SECRET_KEY=change-me-to-a-random-string
     # yt-dlp needs larger tmp space for merging
     tmpfs:
       - /tmp:size=2G

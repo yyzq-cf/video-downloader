@@ -1,29 +1,172 @@
 #!/usr/bin/env python3
 """
 ywsj Video Downloader - Web UI for yt-dlp
-基于 yt-dlp 的视频下载器，支持.Cloudflare 绕过、多线程下载、实时进度
+基于 yt-dlp 的视频下载器，支持 Cloudflare 绕过、多线程下载、实时进度
 """
 
 import os
 import re
 import json
 import uuid
+import hashlib
+import secrets
+import sqlite3
 import threading
 import subprocess
 import time
 import mimetypes
-from flask import Flask, request, jsonify, send_file, render_template
+from functools import wraps
+from flask import Flask, request, jsonify, send_file, render_template, session
 from pathlib import Path
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+app.permanent_session_lifetime = 7 * 24 * 3600  # 7 days
 
 BASE_DIR = Path(__file__).resolve().parent
 DOWNLOAD_DIR = BASE_DIR / "downloads"
 DOWNLOAD_DIR.mkdir(exist_ok=True)
+DB_PATH = BASE_DIR / "data" / "users.db"
+DB_PATH.parent.mkdir(exist_ok=True)
 
 # 存储下载任务状态
 tasks = {}
 tasks_lock = threading.Lock()
+
+# === 认证相关 ===
+MAX_LOGIN_ATTEMPTS = 5
+LOCK_TIME = 300  # 5 minutes
+login_attempts = {}  # ip -> {count, lock_until}
+
+
+def init_db():
+    """初始化用户数据库"""
+    conn = sqlite3.connect(str(DB_PATH))
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            salt TEXT NOT NULL,
+            created_at REAL NOT NULL
+        )
+    ''')
+    conn.commit()
+    # 检查是否有用户，没有则创建默认用户
+    c.execute('SELECT COUNT(*) FROM users')
+    if c.fetchone()[0] == 0:
+        default_user = os.environ.get('AUTH_USERNAME', 'admin')
+        default_pass = os.environ.get('AUTH_PASSWORD', 'admin123')
+        create_user(default_user, default_pass)
+    conn.close()
+
+
+def create_user(username, password):
+    """创建用户"""
+    salt = secrets.token_hex(16)
+    password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+    conn = sqlite3.connect(str(DB_PATH))
+    c = conn.cursor()
+    try:
+        c.execute(
+            'INSERT INTO users (username, password_hash, salt, created_at) VALUES (?, ?, ?, ?)',
+            (username, password_hash, salt, time.time())
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        pass  # 用户已存在
+    conn.close()
+
+
+def verify_user(username, password):
+    """验证用户名密码"""
+    conn = sqlite3.connect(str(DB_PATH))
+    c = conn.cursor()
+    c.execute('SELECT password_hash, salt FROM users WHERE username = ?', (username,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return False
+    stored_hash, salt = row
+    password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+    return password_hash == stored_hash
+
+
+def change_password(username, old_password, new_password):
+    """修改密码"""
+    if not verify_user(username, old_password):
+        return False
+    salt = secrets.token_hex(16)
+    password_hash = hashlib.sha256((new_password + salt).encode()).hexdigest()
+    conn = sqlite3.connect(str(DB_PATH))
+    c = conn.cursor()
+    c.execute('UPDATE users SET password_hash = ?, salt = ? WHERE username = ?',
+              (password_hash, salt, username))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def change_username(old_username, new_username, password):
+    """修改用户名"""
+    if not verify_user(old_username, password):
+        return False
+    conn = sqlite3.connect(str(DB_PATH))
+    c = conn.cursor()
+    try:
+        c.execute('UPDATE users SET username = ? WHERE username = ?', (new_username, old_username))
+        conn.commit()
+        conn.close()
+        return True
+    except sqlite3.IntegrityError:
+        conn.close()
+        return False
+
+
+def get_client_ip():
+    """获取客户端 IP"""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    return request.remote_addr or 'unknown'
+
+
+def check_login_lock(ip):
+    """检查 IP 是否被锁定"""
+    info = login_attempts.get(ip)
+    if not info:
+        return False
+    if info.get('lock_until') and time.time() < info['lock_until']:
+        return True
+    if info.get('lock_until') and time.time() >= info['lock_until']:
+        del login_attempts[ip]
+    return False
+
+
+def record_failed_login(ip):
+    """记录失败登录"""
+    info = login_attempts.setdefault(ip, {'count': 0, 'lock_until': None})
+    info['count'] += 1
+    if info['count'] >= MAX_LOGIN_ATTEMPTS:
+        info['lock_until'] = time.time() + LOCK_TIME
+
+
+def clear_login_attempts(ip):
+    """清除登录尝试记录"""
+    login_attempts.pop(ip, None)
+
+
+def login_required(f):
+    """认证装饰器"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            return jsonify({'error': '未登录', 'auth_required': True}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+# 初始化数据库
+init_db()
 
 
 def sanitize_filename(name):
@@ -238,7 +381,85 @@ def index():
     return render_template('index.html')
 
 
+# === 认证接口 ===
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+
+    ip = get_client_ip()
+
+    if check_login_lock(ip):
+        return jsonify({'error': '尝试次数过多，请 5 分钟后再试'}), 429
+
+    if not username or not password:
+        return jsonify({'error': '请输入用户名和密码'}), 400
+
+    if verify_user(username, password):
+        clear_login_attempts(ip)
+        session.permanent = True
+        session['username'] = username
+        return jsonify({'status': 'ok', 'username': username})
+    else:
+        record_failed_login(ip)
+        remaining = MAX_LOGIN_ATTEMPTS - login_attempts.get(ip, {}).get('count', 0)
+        if remaining > 0:
+            return jsonify({'error': f'用户名或密码错误，剩余 {remaining} 次尝试'}), 401
+        else:
+            return jsonify({'error': '尝试次数过多，请 5 分钟后再试'}), 429
+
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/auth/check')
+def auth_check():
+    if 'username' in session:
+        return jsonify({'logged_in': True, 'username': session['username']})
+    return jsonify({'logged_in': False}), 401
+
+
+@app.route('/api/change-password', methods=['POST'])
+@login_required
+def change_pw():
+    data = request.json or {}
+    old_password = data.get('old_password', '')
+    new_password = data.get('new_password', '')
+
+    if not old_password or not new_password:
+        return jsonify({'error': '请填写完整'}), 400
+    if len(new_password) < 6:
+        return jsonify({'error': '新密码至少 6 位'}), 400
+
+    if change_password(session['username'], old_password, new_password):
+        return jsonify({'status': 'ok'})
+    return jsonify({'error': '原密码错误'}), 400
+
+
+@app.route('/api/change-username', methods=['POST'])
+@login_required
+def change_un():
+    data = request.json or {}
+    new_username = data.get('new_username', '').strip()
+    password = data.get('password', '')
+
+    if not new_username or not password:
+        return jsonify({'error': '请填写完整'}), 400
+    if len(new_username) < 3:
+        return jsonify({'error': '用户名至少 3 个字符'}), 400
+
+    if change_username(session['username'], new_username, password):
+        session['username'] = new_username
+        return jsonify({'status': 'ok', 'username': new_username})
+    return jsonify({'error': '密码错误或用户名已存在'}), 400
+
+
 @app.route('/api/download', methods=['POST'])
+@login_required
 def start_download():
     data = request.json or {}
     url = data.get('url', '').strip()
@@ -276,6 +497,7 @@ def start_download():
 
 
 @app.route('/api/status/<task_id>')
+@login_required
 def get_status(task_id):
     with tasks_lock:
         task = tasks.get(task_id)
@@ -307,6 +529,7 @@ def get_status(task_id):
 
 
 @app.route('/api/tasks')
+@login_required
 def list_tasks():
     with tasks_lock:
         all_tasks = []
@@ -326,6 +549,7 @@ def list_tasks():
 
 
 @app.route('/api/cancel/<task_id>', methods=['POST'])
+@login_required
 def cancel_download(task_id):
     with tasks_lock:
         task = tasks.get(task_id)
@@ -340,6 +564,7 @@ def cancel_download(task_id):
 
 
 @app.route('/api/delete/<task_id>', methods=['POST'])
+@login_required
 def delete_task(task_id):
     with tasks_lock:
         task = tasks.get(task_id)
@@ -357,6 +582,7 @@ def delete_task(task_id):
 
 
 @app.route('/api/files')
+@login_required
 def list_files():
     files = []
     for f in sorted(DOWNLOAD_DIR.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
@@ -372,6 +598,7 @@ def list_files():
 
 
 @app.route('/api/file/<path:filename>')
+@login_required
 def download_file(filename):
     filepath = DOWNLOAD_DIR / filename
     if not filepath.exists():
@@ -382,6 +609,7 @@ def download_file(filename):
 
 
 @app.route('/api/file/<path:filename>/stream')
+@login_required
 def stream_file(filename):
     filepath = DOWNLOAD_DIR / filename
     if not filepath.exists():
@@ -392,6 +620,7 @@ def stream_file(filename):
 
 
 @app.route('/api/file/<path:filename>', methods=['DELETE'])
+@login_required
 def delete_file(filename):
     filepath = DOWNLOAD_DIR / filename
     if not filepath.exists():

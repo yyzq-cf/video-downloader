@@ -22,13 +22,7 @@
             --border: #2a2a4a;
             --radius: 12px;
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
             background: var(--bg-primary);
@@ -36,7 +30,88 @@
             min-height: 100vh;
         }
 
-        /* Header */
+        /* === Login Page === */
+        #loginPage {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .login-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .login-card .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+            justify-content: center;
+        }
+        .login-card .logo svg { width: 36px; height: 36px; fill: var(--accent); }
+        .login-card .logo h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), #ff8c42);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .login-field { margin-bottom: 1.25rem; }
+        .login-field label {
+            display: block;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.4rem;
+        }
+        .login-field input {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.7rem 1rem;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .login-field input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        .btn-login {
+            width: 100%;
+            background: linear-gradient(135deg, var(--accent), #ff6b42);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-login:hover { box-shadow: 0 4px 16px var(--accent-glow); }
+        .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
+        .login-error {
+            background: rgba(231,76,60,0.15);
+            border: 1px solid var(--error);
+            border-radius: 8px;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.82rem;
+            color: var(--error);
+            margin-bottom: 1rem;
+            display: none;
+        }
+        .login-error.show { display: block; }
+
+        /* === Header === */
         header {
             background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card));
             border-bottom: 1px solid var(--border);
@@ -45,19 +120,8 @@
             align-items: center;
             justify-content: space-between;
         }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .logo svg {
-            width: 32px;
-            height: 32px;
-            fill: var(--accent);
-        }
-
+        .logo { display: flex; align-items: center; gap: 0.75rem; }
+        .logo svg { width: 32px; height: 32px; fill: var(--accent); }
         .logo h1 {
             font-size: 1.4rem;
             font-weight: 700;
@@ -66,26 +130,28 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-
-        .header-stats {
-            display: flex;
-            gap: 1.5rem;
-            font-size: 0.85rem;
+        .header-right { display: flex; align-items: center; gap: 1.5rem; }
+        .header-stats { display: flex; gap: 1.5rem; font-size: 0.85rem; color: var(--text-secondary); }
+        .header-stats span { display: flex; align-items: center; gap: 0.3rem; }
+        .user-menu { display: flex; align-items: center; gap: 0.5rem; }
+        .user-name { font-size: 0.85rem; color: var(--text-secondary); }
+        .btn-icon-header {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.35rem 0.7rem;
             color: var(--text-secondary);
-        }
-
-        .header-stats span {
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
             gap: 0.3rem;
         }
+        .btn-icon-header:hover { color: var(--text-primary); border-color: var(--accent); }
 
-        /* Main */
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 2rem 1rem;
-        }
+        /* === Main === */
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
 
         /* Download Form */
         .download-card {
@@ -95,7 +161,6 @@
             padding: 1.75rem;
             margin-bottom: 1.5rem;
         }
-
         .download-card h2 {
             font-size: 1.1rem;
             margin-bottom: 1rem;
@@ -104,13 +169,7 @@
             align-items: center;
             gap: 0.5rem;
         }
-
-        .input-group {
-            display: flex;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-
+        .input-group { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
         .url-input {
             flex: 1;
             background: var(--bg-input);
@@ -121,17 +180,8 @@
             font-size: 0.95rem;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-
-        .url-input:focus {
-            outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-glow);
-        }
-
-        .url-input::placeholder {
-            color: var(--text-muted);
-        }
-
+        .url-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .url-input::placeholder { color: var(--text-muted); }
         .btn-download {
             background: linear-gradient(135deg, var(--accent), #ff6b42);
             color: white;
@@ -147,40 +197,13 @@
             align-items: center;
             gap: 0.4rem;
         }
+        .btn-download:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--accent-glow); }
+        .btn-download:active { transform: translateY(0); }
+        .btn-download:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .btn-download:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 16px var(--accent-glow);
-        }
-
-        .btn-download:active {
-            transform: translateY(0);
-        }
-
-        .btn-download:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* Options */
-        .options {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .option-group {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .option-group label {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-
+        .options { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        .option-group { display: flex; align-items: center; gap: 0.5rem; }
+        .option-group label { font-size: 0.85rem; color: var(--text-secondary); }
         select {
             background: var(--bg-input);
             border: 1px solid var(--border);
@@ -190,20 +213,10 @@
             font-size: 0.85rem;
             cursor: pointer;
         }
-
-        select:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
+        select:focus { outline: none; border-color: var(--accent); }
 
         /* Tabs */
-        .tabs {
-            display: flex;
-            gap: 0;
-            margin-bottom: 1rem;
-            border-bottom: 2px solid var(--border);
-        }
-
+        .tabs { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 2px solid var(--border); }
         .tab {
             padding: 0.6rem 1.2rem;
             font-size: 0.9rem;
@@ -213,23 +226,11 @@
             margin-bottom: -2px;
             transition: all 0.2s;
         }
-
-        .tab.active {
-            color: var(--accent);
-            border-bottom-color: var(--accent);
-        }
-
-        .tab:hover:not(.active) {
-            color: var(--text-primary);
-        }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .tab:hover:not(.active) { color: var(--text-primary); }
 
         /* Task List */
-        .task-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
+        .task-list { display: flex; flex-direction: column; gap: 0.75rem; }
         .task-item {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -237,18 +238,8 @@
             padding: 1rem 1.25rem;
             transition: border-color 0.2s;
         }
-
-        .task-item:hover {
-            border-color: var(--accent);
-        }
-
-        .task-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.6rem;
-        }
-
+        .task-item:hover { border-color: var(--accent); }
+        .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; }
         .task-url {
             font-size: 0.85rem;
             color: var(--text-secondary);
@@ -257,12 +248,7 @@
             text-overflow: ellipsis;
             max-width: 500px;
         }
-
-        .task-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-
+        .task-actions { display: flex; gap: 0.5rem; }
         .task-btn {
             background: var(--bg-input);
             border: 1px solid var(--border);
@@ -273,30 +259,12 @@
             cursor: pointer;
             transition: all 0.2s;
         }
+        .task-btn:hover { color: var(--text-primary); border-color: var(--accent); }
+        .task-btn.danger:hover { color: var(--error); border-color: var(--error); }
 
-        .task-btn:hover {
-            color: var(--text-primary);
-            border-color: var(--accent);
-        }
-
-        .task-btn.danger:hover {
-            color: var(--error);
-            border-color: var(--error);
-        }
-
-        /* Progress Bar */
-        .progress-container {
-            margin-bottom: 0.5rem;
-        }
-
-        .progress-bar {
-            height: 8px;
-            background: var(--bg-input);
-            border-radius: 4px;
-            overflow: hidden;
-            position: relative;
-        }
-
+        /* Progress */
+        .progress-container { margin-bottom: 0.5rem; }
+        .progress-bar { height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; position: relative; }
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, var(--accent), #ff8c42);
@@ -304,62 +272,23 @@
             transition: width 0.3s;
             position: relative;
         }
-
         .progress-fill::after {
             content: '';
             position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; right: 0; bottom: 0;
             width: 30px;
             background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
             animation: shimmer 1.5s infinite;
         }
-
-        @keyframes shimmer {
-            0% { transform: translateX(-30px); }
-            100% { transform: translateX(0); }
-        }
-
-        .progress-fill.completed {
-            background: linear-gradient(90deg, var(--success), #27ae60);
-        }
-
+        @keyframes shimmer { 0% { transform: translateX(-30px); } 100% { transform: translateX(0); } }
+        .progress-fill.completed { background: linear-gradient(90deg, var(--success), #27ae60); }
         .progress-fill.completed::after { display: none; }
-
-        .progress-fill.failed {
-            background: linear-gradient(90deg, var(--error), #c0392b);
-        }
-
+        .progress-fill.failed { background: linear-gradient(90deg, var(--error), #c0392b); }
         .progress-fill.failed::after { display: none; }
-
-        .task-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.82rem;
-        }
-
-        .task-stats {
-            display: flex;
-            gap: 1rem;
-            color: var(--text-secondary);
-        }
-
-        .task-stats span {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        .status-badge {
-            padding: 0.15rem 0.6rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
+        .task-info { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; }
+        .task-stats { display: flex; gap: 1rem; color: var(--text-secondary); }
+        .task-stats span { display: flex; align-items: center; gap: 0.25rem; }
+        .status-badge { padding: 0.15rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
         .status-queued { background: rgba(243,156,18,0.2); color: var(--warning); }
         .status-downloading { background: rgba(233,69,96,0.2); color: var(--accent); }
         .status-merging { background: rgba(155,89,182,0.2); color: #9b59b6; }
@@ -368,12 +297,7 @@
         .status-cancelled { background: rgba(93,109,126,0.2); color: var(--text-muted); }
 
         /* File List */
-        .file-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.6rem;
-        }
-
+        .file-list { display: flex; flex-direction: column; gap: 0.6rem; }
         .file-item {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -384,88 +308,32 @@
             justify-content: space-between;
             transition: border-color 0.2s;
         }
-
-        .file-item:hover {
-            border-color: var(--accent);
-        }
-
-        .file-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .file-name {
-            font-size: 0.9rem;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .file-meta {
-            font-size: 0.78rem;
-            color: var(--text-secondary);
-            margin-top: 0.2rem;
-        }
-
-        .file-actions {
-            display: flex;
-            gap: 0.5rem;
-            flex-shrink: 0;
-        }
-
+        .file-item:hover { border-color: var(--accent); }
+        .file-info { flex: 1; min-width: 0; }
+        .file-name { font-size: 0.9rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-meta { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.2rem; }
+        .file-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
         .btn-icon {
             background: var(--bg-input);
             border: 1px solid var(--border);
             border-radius: 6px;
-            width: 34px;
-            height: 34px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            width: 34px; height: 34px;
+            display: flex; align-items: center; justify-content: center;
             cursor: pointer;
             transition: all 0.2s;
         }
+        .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-icon.danger:hover { border-color: var(--error); color: var(--error); }
+        .btn-icon svg { width: 16px; height: 16px; }
 
-        .btn-icon:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-        }
-
-        .btn-icon.danger:hover {
-            border-color: var(--error);
-            color: var(--error);
-        }
-
-        .btn-icon svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        /* Empty State */
-        .empty {
-            text-align: center;
-            padding: 3rem 1rem;
-            color: var(--text-muted);
-        }
-
-        .empty svg {
-            width: 48px;
-            height: 48px;
-            fill: var(--text-muted);
-            opacity: 0.5;
-            margin-bottom: 1rem;
-        }
-
-        .empty p {
-            font-size: 0.9rem;
-        }
+        /* Empty */
+        .empty { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
+        .empty svg { width: 48px; height: 48px; fill: var(--text-muted); opacity: 0.5; margin-bottom: 1rem; }
+        .empty p { font-size: 0.9rem; }
 
         /* Toast */
         .toast {
-            position: fixed;
-            top: 1.5rem;
-            right: 1.5rem;
+            position: fixed; top: 1.5rem; right: 1.5rem;
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -476,64 +344,89 @@
             animation: slideIn 0.3s ease;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
-
         .toast.success { border-color: var(--success); }
         .toast.error { border-color: var(--error); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        /* Video Player Modal */
+        /* Modal */
         .modal {
             display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8);
             z-index: 2000;
             justify-content: center;
             align-items: center;
         }
-
-        .modal.active {
-            display: flex;
-        }
-
+        .modal.active { display: flex; }
         .modal-content {
             background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: var(--radius);
             padding: 1rem;
             max-width: 90vw;
             max-height: 90vh;
         }
-
-        .modal-content video {
-            max-width: 80vw;
-            max-height: 75vh;
-        }
-
+        .modal-content video { max-width: 80vw; max-height: 75vh; }
         .modal-close {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
+            position: absolute; top: 1rem; right: 1rem;
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 50%;
-            width: 36px;
-            height: 36px;
+            width: 36px; height: 36px;
             color: var(--text-primary);
             cursor: pointer;
             font-size: 1.2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
         }
 
-        /* Responsive */
+        /* Account Modal */
+        .account-modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            width: 100%;
+            max-width: 420px;
+        }
+        .account-modal h2 { font-size: 1.1rem; margin-bottom: 1.5rem; }
+        .account-section { margin-bottom: 1.5rem; }
+        .account-section h3 { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.6rem; }
+        .account-field { margin-bottom: 0.6rem; }
+        .account-field input {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.6rem 0.9rem;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+        .account-field input:focus { outline: none; border-color: var(--accent); }
+        .btn-account {
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-account:hover { background: var(--accent-hover); }
+        .btn-logout {
+            width: 100%;
+            background: transparent;
+            color: var(--error);
+            border: 1px solid var(--error);
+            border-radius: 6px;
+            padding: 0.6rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 0.5rem;
+        }
+        .btn-logout:hover { background: rgba(231,76,60,0.1); }
+
         @media (max-width: 600px) {
             header { padding: 1rem; }
             .container { padding: 1rem 0.5rem; }
@@ -544,20 +437,48 @@
     </style>
 </head>
 <body>
+
+<!-- ===== Login Page ===== -->
+<div id="loginPage">
+    <div class="login-card">
+        <div class="logo">
+            <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.11 0-2 .89-2 2v12a2 2 0 002 2h5l1 1h4l1-1h5a2 2 0 002-2V5a2 2 0 00-2-2zm-8 13v-3h4l-4-5v3H9l4 5z"/></svg>
+            <h1>ywsj Video Downloader</h1>
+        </div>
+        <div class="login-error" id="loginError"></div>
+        <div class="login-field">
+            <label>用户名</label>
+            <input type="text" id="loginUsername" placeholder="用户名" onkeydown="if(event.key==='Enter') doLogin()">
+        </div>
+        <div class="login-field">
+            <label>密码</label>
+            <input type="password" id="loginPassword" placeholder="密码" onkeydown="if(event.key==='Enter') doLogin()">
+        </div>
+        <button class="btn-login" onclick="doLogin()" id="btnLogin">登录</button>
+    </div>
+</div>
+
+<!-- ===== Main App ===== -->
+<div id="mainApp" style="display:none;">
     <header>
         <div class="logo">
             <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.11 0-2 .89-2 2v12a2 2 0 002 2h5l1 1h4l1-1h5a2 2 0 002-2V5a2 2 0 00-2-2zm-8 13v-3h4l-4-5v3H9l4 5z"/></svg>
             <h1>ywsj Video Downloader</h1>
         </div>
-        <div class="header-stats">
-            <span>⚡ <span id="taskCount">0</span> 任务</span>
-            <span>📁 <span id="fileCount">0</span> 文件</span>
-            <span>💾 <span id="totalSize">0 B</span></span>
+        <div class="header-right">
+            <div class="header-stats">
+                <span>⚡ <span id="taskCount">0</span> 任务</span>
+                <span>📁 <span id="fileCount">0</span> 文件</span>
+                <span>💾 <span id="totalSize">0 B</span></span>
+            </div>
+            <div class="user-menu">
+                <span class="user-name" id="userNameDisplay"></span>
+                <button class="btn-icon-header" onclick="showAccountModal()">⚙ 账户</button>
+            </div>
         </div>
     </header>
 
     <div class="container">
-        <!-- Download Form -->
         <div class="download-card">
             <h2>🔗 新建下载</h2>
             <div class="input-group">
@@ -591,291 +512,353 @@
             </div>
         </div>
 
-        <!-- Tabs -->
         <div class="tabs">
             <div class="tab active" onclick="switchTab('tasks')" id="tabTasks">📥 下载队列</div>
             <div class="tab" onclick="switchTab('files')" id="tabFiles">📁 已下载文件</div>
         </div>
 
-        <!-- Task List -->
         <div id="taskListPanel" class="task-list"></div>
-
-        <!-- File List -->
         <div id="fileListPanel" class="file-list" style="display:none;"></div>
     </div>
+</div>
 
-    <!-- Video Player Modal -->
-    <div class="modal" id="playerModal" onclick="closePlayer(event)">
-        <div class="modal-content">
-            <button class="modal-close" onclick="closePlayer()">&times;</button>
-            <video id="player" controls autoplay></video>
-        </div>
+<!-- Video Player Modal -->
+<div class="modal" id="playerModal" onclick="closePlayer(event)">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closePlayer()">&times;</button>
+        <video id="player" controls autoplay></video>
     </div>
+</div>
 
-    <script>
-        let currentTab = 'tasks';
-        let pollingTimer = null;
-        let activeTasks = new Set();
+<!-- Account Modal -->
+<div class="modal" id="accountModal" onclick="closeAccountModal(event)">
+    <div class="account-modal">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h2>⚙ 账户管理</h2>
+            <button class="modal-close" style="position:static;" onclick="closeAccountModal()">&times;</button>
+        </div>
+        <div class="account-section">
+            <h3>修改用户名</h3>
+            <div class="account-field"><input type="text" id="newUsername" placeholder="新用户名"></div>
+            <div class="account-field"><input type="password" id="changeUnPassword" placeholder="当前密码"></div>
+            <button class="btn-account" onclick="doChangeUsername()">修改用户名</button>
+        </div>
+        <div class="account-section">
+            <h3>修改密码</h3>
+            <div class="account-field"><input type="password" id="oldPassword" placeholder="原密码"></div>
+            <div class="account-field"><input type="password" id="newPassword" placeholder="新密码 (至少6位)"></div>
+            <button class="btn-account" onclick="doChangePassword()">修改密码</button>
+        </div>
+        <button class="btn-logout" onclick="doLogout()">退出登录</button>
+    </div>
+</div>
 
-        // === Download ===
-        async function startDownload() {
-            const url = document.getElementById('urlInput').value.trim();
-            const format = document.getElementById('formatSelect').value;
-            const concurrent = document.getElementById('concurrentSelect').value;
+<script>
+let currentTab = 'tasks';
+let pollingTimer = null;
+let activeTasks = new Set();
 
-            if (!url) { showToast('请输入 URL', 'error'); return; }
-
-            const btn = document.getElementById('btnStart');
-            btn.disabled = true;
-            btn.textContent = '提交中...';
-
-            try {
-                const resp = await fetch('/api/download', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, format, concurrent: parseInt(concurrent) })
-                });
-                const data = await resp.json();
-
-                if (data.error) {
-                    showToast(data.error, 'error');
-                } else {
-                    showToast('下载任务已创建', 'success');
-                    document.getElementById('urlInput').value = '';
-                    activeTasks.add(data.task_id);
-                    startPolling();
-                    fetchTasks();
-                }
-            } catch (e) {
-                showToast('请求失败: ' + e.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>下载';
-            }
-        }
-
-        // === Tasks ===
-        async function fetchTasks() {
-            const resp = await fetch('/api/tasks');
-            const tasks = await resp.json();
-
-            const container = document.getElementById('taskListPanel');
-            if (tasks.length === 0) {
-                container.innerHTML = `
-                    <div class="empty">
-                        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-                        <p>暂无下载任务</p>
-                        <p style="margin-top:0.5rem; font-size:0.8rem;">在上方输入链接开始下载</p>
-                    </div>`;
-                updateStats(tasks.length, null);
+// === Auth ===
+async function checkAuth() {
+    try {
+        const resp = await fetch('/api/auth/check');
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.logged_in) {
+                showApp(data.username);
                 return;
             }
-
-            container.innerHTML = tasks.map(t => {
-                const pct = t.percent || 0;
-                const statusClass = t.status || 'queued';
-                let stats = '';
-
-                if (t.status === 'downloading') {
-                    activeTasks.add(t.id);
-                    const parts = [];
-                    if (t.total_size) parts.push(`📦 ${t.total_size}`);
-                    if (t.speed) parts.push(`⚡ ${t.speed}`);
-                    if (t.eta) parts.push(`⏱ ${t.eta}`);
-                    if (t.frag_total) parts.push(`🧩 ${t.frag_current||0}/${t.frag_total}`);
-                    if (t.elapsed) parts.push(`⏳ ${t.elapsed}`);
-                    stats = parts.join('  ');
-                } else if (t.status === 'completed') {
-                    stats = `✅ ${t.file_size || ''}  ${t.elapsed ? '耗时 ' + t.elapsed : ''}`;
-                } else if (t.status === 'failed') {
-                    stats = `❌ ${t.error || '下载失败'}`;
-                } else if (t.status === 'merging') {
-                    stats = '🔄 正在合并...';
-                } else if (t.status === 'cancelled') {
-                    stats = '🚫 已取消';
-                } else {
-                    stats = '⏳ 等待中...';
-                }
-
-                let actions = '';
-                if (t.status === 'downloading' || t.status === 'queued' || t.status === 'merging') {
-                    actions = `<button class="task-btn danger" onclick="cancelTask('${t.id}')">取消</button>`;
-                } else if (t.status === 'completed' && t.output_file) {
-                    actions = `
-                        <button class="task-btn" onclick="playFile('${encodeURIComponent(t.output_file)}')">▶ 播放</button>
-                        <button class="task-btn" onclick="downloadFile('${encodeURIComponent(t.output_file)}')">⬇ 保存</button>
-                        <button class="task-btn danger" onclick="deleteTask('${t.id}')">删除</button>`;
-                } else if (t.status === 'failed' || t.status === 'cancelled') {
-                    actions = `<button class="task-btn danger" onclick="deleteTask('${t.id}')">删除</button>`;
-                }
-
-                return `
-                    <div class="task-item">
-                        <div class="task-header">
-                            <div class="task-url" title="${t.url}">${t.url}</div>
-                            <div class="task-actions">${actions}</div>
-                        </div>
-                        <div class="progress-container">
-                            <div class="progress-bar">
-                                <div class="progress-fill ${t.status}" style="width:${pct}%"></div>
-                            </div>
-                        </div>
-                        <div class="task-info">
-                            <span class="status-badge status-${statusClass}">${statusClass}</span>
-                            <span class="task-stats">${stats}</span>
-                        </div>
-                    </div>`;
-            }).join('');
-
-            updateStats(tasks.length, tasks.filter(t => t.status === 'completed').length);
-
-            // 停止轮询条件
-            if (activeTasks.size === 0 && pollingTimer) {
-                clearInterval(pollingTimer);
-                pollingTimer = null;
-            }
         }
+    } catch(e) {}
+    showLogin();
+}
 
-        async function cancelTask(id) {
-            await fetch(`/api/cancel/${id}`, { method: 'POST' });
-            showToast('任务已取消', 'success');
+function showLogin() {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('loginUsername').value = '';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginUsername').focus();
+}
+
+function showApp(username) {
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    document.getElementById('userNameDisplay').textContent = '👤 ' + username;
+    fetchTasks();
+    fetchFiles();
+}
+
+async function doLogin() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errDiv = document.getElementById('loginError');
+    const btn = document.getElementById('btnLogin');
+
+    if (!username || !password) { errDiv.textContent = '请输入用户名和密码'; errDiv.classList.add('show'); return; }
+    errDiv.classList.remove('show');
+    btn.disabled = true;
+    btn.textContent = '登录中...';
+
+    try {
+        const resp = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await resp.json();
+        if (data.error) {
+            errDiv.textContent = data.error;
+            errDiv.classList.add('show');
+        } else {
+            showApp(data.username);
+        }
+    } catch(e) {
+        errDiv.textContent = '请求失败: ' + e.message;
+        errDiv.classList.add('show');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '登录';
+    }
+}
+
+async function doLogout() {
+    await fetch('/api/logout', { method: 'POST' });
+    closeAccountModal();
+    showLogin();
+}
+
+function showAccountModal() {
+    document.getElementById('accountModal').classList.add('active');
+}
+function closeAccountModal(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('accountModal').classList.remove('active');
+}
+
+async function doChangePassword() {
+    const oldPw = document.getElementById('oldPassword').value;
+    const newPw = document.getElementById('newPassword').value;
+    if (!oldPw || !newPw) { showToast('请填写完整', 'error'); return; }
+    const resp = await fetch('/api/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_password: oldPw, new_password: newPw })
+    });
+    const data = await resp.json();
+    if (data.status === 'ok') {
+        showToast('密码修改成功', 'success');
+        document.getElementById('oldPassword').value = '';
+        document.getElementById('newPassword').value = '';
+    } else {
+        showToast(data.error || '修改失败', 'error');
+    }
+}
+
+async function doChangeUsername() {
+    const newUn = document.getElementById('newUsername').value.trim();
+    const pw = document.getElementById('changeUnPassword').value;
+    if (!newUn || !pw) { showToast('请填写完整', 'error'); return; }
+    const resp = await fetch('/api/change-username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_username: newUn, password: pw })
+    });
+    const data = await resp.json();
+    if (data.status === 'ok') {
+        showToast('用户名修改成功', 'success');
+        document.getElementById('userNameDisplay').textContent = '👤 ' + data.username;
+        document.getElementById('newUsername').value = '';
+        document.getElementById('changeUnPassword').value = '';
+    } else {
+        showToast(data.error || '修改失败', 'error');
+    }
+}
+
+// === Download ===
+async function startDownload() {
+    const url = document.getElementById('urlInput').value.trim();
+    const format = document.getElementById('formatSelect').value;
+    const concurrent = document.getElementById('concurrentSelect').value;
+    if (!url) { showToast('请输入 URL', 'error'); return; }
+    const btn = document.getElementById('btnStart');
+    btn.disabled = true;
+    btn.textContent = '提交中...';
+    try {
+        const resp = await fetch('/api/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, format, concurrent: parseInt(concurrent) })
+        });
+        if (resp.status === 401) { showLogin(); return; }
+        const data = await resp.json();
+        if (data.error) {
+            showToast(data.error, 'error');
+        } else {
+            showToast('下载任务已创建', 'success');
+            document.getElementById('urlInput').value = '';
+            activeTasks.add(data.task_id);
+            startPolling();
             fetchTasks();
         }
+    } catch (e) {
+        showToast('请求失败: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>下载';
+    }
+}
 
-        async function deleteTask(id) {
-            await fetch(`/api/delete/${id}`, { method: 'POST' });
-            showToast('已删除', 'success');
-            fetchTasks();
-            if (currentTab === 'files') fetchFiles();
+// === Tasks ===
+async function fetchTasks() {
+    const resp = await fetch('/api/tasks');
+    if (resp.status === 401) { showLogin(); return; }
+    const tasks = await resp.json();
+    const container = document.getElementById('taskListPanel');
+    if (tasks.length === 0) {
+        container.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg><p>暂无下载任务</p><p style="margin-top:0.5rem;font-size:0.8rem;">在上方输入链接开始下载</p></div>`;
+        updateStats(tasks.length, null);
+        return;
+    }
+    container.innerHTML = tasks.map(t => {
+        const pct = t.percent || 0;
+        const statusClass = t.status || 'queued';
+        let stats = '';
+        if (t.status === 'downloading') {
+            activeTasks.add(t.id);
+            const parts = [];
+            if (t.total_size) parts.push(`📦 ${t.total_size}`);
+            if (t.speed) parts.push(`⚡ ${t.speed}`);
+            if (t.eta) parts.push(`⏱ ${t.eta}`);
+            if (t.frag_total) parts.push(`🧩 ${t.frag_current||0}/${t.frag_total}`);
+            if (t.elapsed) parts.push(`⏳ ${t.elapsed}`);
+            stats = parts.join('  ');
+        } else if (t.status === 'completed') {
+            stats = `✅ ${t.file_size || ''}  ${t.elapsed ? '耗时 ' + t.elapsed : ''}`;
+        } else if (t.status === 'failed') {
+            stats = `❌ ${t.error || '下载失败'}`;
+        } else if (t.status === 'merging') {
+            stats = '🔄 正在合并...';
+        } else if (t.status === 'cancelled') {
+            stats = '🚫 已取消';
+        } else {
+            stats = '⏳ 等待中...';
         }
-
-        // === Files ===
-        async function fetchFiles() {
-            const resp = await fetch('/api/files');
-            const files = await resp.json();
-
-            const container = document.getElementById('fileListPanel');
-            if (files.length === 0) {
-                container.innerHTML = `
-                    <div class="empty">
-                        <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                        <p>暂无已下载文件</p>
-                    </div>`;
-                return;
-            }
-
-            container.innerHTML = files.map(f => {
-                const ext = f.name.split('.').pop().toLowerCase();
-                const isVideo = ['mp4', 'mkv', 'webm', 'avi', 'mov'].includes(ext);
-                const isAudio = ['mp3', 'm4a', 'wav', 'ogg', 'flac'].includes(ext);
-                const icon = isVideo ? '🎬' : isAudio ? '🎵' : '📄';
-
-                const date = new Date(f.modified * 1000);
-                const dateStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2,'0')}`;
-
-                return `
-                    <div class="file-item">
-                        <div class="file-info">
-                            <div class="file-name">${icon} ${f.name}</div>
-                            <div class="file-meta">${f.size}  ·  ${dateStr}</div>
-                        </div>
-                        <div class="file-actions">
-                            ${isVideo || isAudio ? `<button class="btn-icon" onclick="playFile('${encodeURIComponent(f.name)}')" title="播放">
-                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                            </button>` : ''}
-                            <button class="btn-icon" onclick="downloadFile('${encodeURIComponent(f.name)}')" title="下载到本地">
-                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-                            </button>
-                            <button class="btn-icon danger" onclick="deleteFile('${encodeURIComponent(f.name)}')" title="删除">
-                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                            </button>
-                        </div>
-                    </div>`;
-            }).join('');
-
-            // Update file count/size
-            document.getElementById('fileCount').textContent = files.length;
-            const total = files.reduce((sum, f) => sum + (f.size_bytes || 0), 0);
-            document.getElementById('totalSize').textContent = formatSize(total);
+        let actions = '';
+        if (t.status === 'downloading' || t.status === 'queued' || t.status === 'merging') {
+            actions = `<button class="task-btn danger" onclick="cancelTask('${t.id}')">取消</button>`;
+        } else if (t.status === 'completed' && t.output_file) {
+            actions = `<button class="task-btn" onclick="playFile('${encodeURIComponent(t.output_file)}')">▶ 播放</button><button class="task-btn" onclick="downloadFile('${encodeURIComponent(t.output_file)}')">⬇ 保存</button><button class="task-btn danger" onclick="deleteTask('${t.id}')">删除</button>`;
+        } else if (t.status === 'failed' || t.status === 'cancelled') {
+            actions = `<button class="task-btn danger" onclick="deleteTask('${t.id}')">删除</button>`;
         }
+        return `<div class="task-item"><div class="task-header"><div class="task-url" title="${t.url}">${t.url}</div><div class="task-actions">${actions}</div></div><div class="progress-container"><div class="progress-bar"><div class="progress-fill ${t.status}" style="width:${pct}%"></div></div></div><div class="task-info"><span class="status-badge status-${statusClass}">${statusClass}</span><span class="task-stats">${stats}</span></div></div>`;
+    }).join('');
+    updateStats(tasks.length, null);
+    if (activeTasks.size === 0 && pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+}
 
-        function formatSize(bytes) {
-            if (!bytes) return '0 B';
-            const units = ['B','KB','MB','GB','TB'];
-            let i = 0;
-            while (bytes >= 1024 && i < units.length-1) { bytes /= 1024; i++; }
-            return bytes.toFixed(1) + ' ' + units[i];
-        }
+async function cancelTask(id) {
+    await fetch(`/api/cancel/${id}`, { method: 'POST' });
+    showToast('任务已取消', 'success');
+    fetchTasks();
+}
+async function deleteTask(id) {
+    await fetch(`/api/delete/${id}`, { method: 'POST' });
+    showToast('已删除', 'success');
+    fetchTasks();
+    if (currentTab === 'files') fetchFiles();
+}
 
-        function downloadFile(name) {
-            window.location.href = `/api/file/${name}`;
-        }
+// === Files ===
+async function fetchFiles() {
+    const resp = await fetch('/api/files');
+    if (resp.status === 401) { showLogin(); return; }
+    const files = await resp.json();
+    const container = document.getElementById('fileListPanel');
+    if (files.length === 0) {
+        container.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg><p>暂无已下载文件</p></div>`;
+        return;
+    }
+    container.innerHTML = files.map(f => {
+        const ext = f.name.split('.').pop().toLowerCase();
+        const isVideo = ['mp4','mkv','webm','avi','mov'].includes(ext);
+        const isAudio = ['mp3','m4a','wav','ogg','flac'].includes(ext);
+        const icon = isVideo ? '🎬' : isAudio ? '🎵' : '📄';
+        const date = new Date(f.modified * 1000);
+        const dateStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2,'0')}`;
+        return `<div class="file-item"><div class="file-info"><div class="file-name">${icon} ${f.name}</div><div class="file-meta">${f.size}  ·  ${dateStr}</div></div><div class="file-actions">${(isVideo||isAudio) ? `<button class="btn-icon" onclick="playFile('${encodeURIComponent(f.name)}')" title="播放"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>` : ''}<button class="btn-icon" onclick="downloadFile('${encodeURIComponent(f.name)}')" title="下载到本地"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button><button class="btn-icon danger" onclick="deleteFile('${encodeURIComponent(f.name)}')" title="删除"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></div></div>`;
+    }).join('');
+    document.getElementById('fileCount').textContent = files.length;
+    const total = files.reduce((sum, f) => sum + (f.size_bytes || 0), 0);
+    document.getElementById('totalSize').textContent = formatSize(total);
+}
 
-        function deleteFile(name) {
-            if (!confirm('确定删除文件？')) return;
-            fetch(`/api/file/${name}`, { method: 'DELETE' })
-                .then(() => { showToast('文件已删除', 'success'); fetchFiles(); });
-        }
+function formatSize(bytes) {
+    if (!bytes) return '0 B';
+    const units = ['B','KB','MB','GB','TB'];
+    let i = 0;
+    while (bytes >= 1024 && i < units.length-1) { bytes /= 1024; i++; }
+    return bytes.toFixed(1) + ' ' + units[i];
+}
+function downloadFile(name) { window.location.href = `/api/file/${name}`; }
+function deleteFile(name) {
+    if (!confirm('确定删除文件？')) return;
+    fetch(`/api/file/${name}`, { method: 'DELETE' }).then(() => { showToast('文件已删除', 'success'); fetchFiles(); });
+}
+function playFile(name) {
+    const modal = document.getElementById('playerModal');
+    const player = document.getElementById('player');
+    player.src = `/api/file/${name}/stream`;
+    modal.classList.add('active');
+}
+function closePlayer(e) {
+    if (e && e.target !== e.currentTarget) return;
+    const modal = document.getElementById('playerModal');
+    const player = document.getElementById('player');
+    modal.classList.remove('active');
+    player.pause();
+    player.src = '';
+}
 
-        function playFile(name) {
-            const modal = document.getElementById('playerModal');
-            const player = document.getElementById('player');
-            player.src = `/api/file/${name}/stream`;
-            modal.classList.add('active');
-        }
+// === Tabs ===
+function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById('tabTasks').classList.toggle('active', tab === 'tasks');
+    document.getElementById('tabFiles').classList.toggle('active', tab === 'files');
+    document.getElementById('taskListPanel').style.display = tab === 'tasks' ? 'flex' : 'none';
+    document.getElementById('fileListPanel').style.display = tab === 'files' ? 'flex' : 'none';
+    if (tab === 'files') fetchFiles();
+}
 
-        function closePlayer(e) {
-            if (e && e.target !== e.currentTarget) return;
-            const modal = document.getElementById('playerModal');
-            const player = document.getElementById('player');
-            modal.classList.remove('active');
-            player.pause();
-            player.src = '';
-        }
+// === Polling ===
+function startPolling() {
+    if (pollingTimer) return;
+    pollingTimer = setInterval(() => {
+        if (activeTasks.size > 0) fetchTasks();
+    }, 1000);
+}
 
-        // === Tabs ===
-        function switchTab(tab) {
-            currentTab = tab;
-            document.getElementById('tabTasks').classList.toggle('active', tab === 'tasks');
-            document.getElementById('tabFiles').classList.toggle('active', tab === 'files');
-            document.getElementById('taskListPanel').style.display = tab === 'tasks' ? 'flex' : 'none';
-            document.getElementById('fileListPanel').style.display = tab === 'files' ? 'flex' : 'none';
-            if (tab === 'files') fetchFiles();
-        }
+// === Stats ===
+function updateStats(taskCount, fileCount) {
+    document.getElementById('taskCount').textContent = taskCount;
+    if (fileCount !== null) document.getElementById('fileCount').textContent = fileCount;
+}
 
-        // === Polling ===
-        function startPolling() {
-            if (pollingTimer) return;
-            pollingTimer = setInterval(() => {
-                if (activeTasks.size > 0) {
-                    fetchTasks();
-                }
-            }, 1000);
-        }
+// === Toast ===
+function showToast(msg, type = '') {
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + type;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.animation = 'slideIn 0.3s ease reverse';
+        setTimeout(() => toast.remove(), 300);
+    }, 2500);
+}
 
-        // === Stats ===
-        function updateStats(taskCount, fileCount) {
-            document.getElementById('taskCount').textContent = taskCount;
-            if (fileCount !== null) {
-                document.getElementById('fileCount').textContent = fileCount;
-            }
-        }
-
-        // === Toast ===
-        function showToast(msg, type = '') {
-            const toast = document.createElement('div');
-            toast.className = 'toast ' + type;
-            toast.textContent = msg;
-            document.body.appendChild(toast);
-            setTimeout(() => {
-                toast.style.animation = 'slideIn 0.3s ease reverse';
-                setTimeout(() => toast.remove(), 300);
-            }, 2500);
-        }
-
-        // === Init ===
-        fetchTasks();
-        fetchFiles();
-    </script>
+// === Init ===
+checkAuth();
+</script>
 </body>
 </html>

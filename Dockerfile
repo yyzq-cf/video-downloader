@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 LABEL maintainer="ywsj"
-LABEL description="ywsj Video Downloader - Web UI for yt-dlp with Cloudflare bypass"
+LABEL description="ywsj Video Downloader - Web UI for yt-dlp with Cloudflare bypass and auth"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -21,12 +21,17 @@ WORKDIR /app
 
 COPY . .
 
-# Download directory
-RUN mkdir -p /app/downloads
+# Download + data directories
+RUN mkdir -p /app/downloads /app/data
 
 VOLUME /app/downloads
+VOLUME /app/data
 
 EXPOSE 5200
+
+# Default auth (override with env vars)
+ENV AUTH_USERNAME=admin
+ENV AUTH_PASSWORD=admin123
 
 # Gunicorn with threaded workers
 CMD ["gunicorn", "--bind", "0.0.0.0:5200", "--workers", "2", "--threads", "4", "--timeout", "600", "app:app"]
