@@ -630,6 +630,60 @@ def delete_file(filename):
     return jsonify({'status': 'deleted'})
 
 
+
+
+@app.route('/api/clear-cache', methods=['POST'])
+@login_required
+def clear_cache():
+    """清除下载缓存: 删除所有 .part/.ytdl 临时文件, 清除已取消/失败的任务记录"""
+    deleted_files = []
+    freed_bytes = 0
+
+    # 删除临时文件 (.part, .part-Frag*, .ytdl)
+    for f in DOWNLOAD_DIR.iterdir():
+        if f.is_file() and (f.name.endswith('.part') or f.name.endswith('.ytdl') or '.part-Frag' in f.name):
+            size = f.stat().st_size
+            freed_bytes += size
+            deleted_files.append(f.name)
+            f.unlink()
+
+    # 清除已取消/失败的任务记录 (保留 downloading/completed/queued/merging)
+    removed_tasks = []
+    with tasks_lock:
+        to_remove = []
+        for tid, t in tasks.items():
+            if t.get('status') in ('cancelled', 'failed'):
+                to_remove.append(tid)
+                removed_tasks.append(tid)
+        for tid in to_remove:
+            del tasks[tid]
+
+    return jsonify({
+        'status': 'ok',
+        'deleted_files': deleted_files,
+        'freed_space': get_file_size_str(freed_bytes),
+        'removed_tasks': removed_tasks,
+        'files_count': len(deleted_files),
+        'tasks_count': len(removed_tasks),
+    })
+
+
+@app.route('/api/clear-tasks', methods=['POST'])
+@login_required
+def clear_tasks():
+    """清除所有已完成/取消/失败的任务记录 (不删文件)"""
+    removed = []
+    with tasks_lock:
+        to_remove = []
+        for tid, t in tasks.items():
+            if t.get('status') in ('completed', 'cancelled', 'failed'):
+                to_remove.append(tid)
+                removed.append(tid)
+        for tid in to_remove:
+            del tasks[tid]
+    return jsonify({'status': 'ok', 'removed_tasks': removed, 'count': len(removed)})
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5200))
     print(f"🚀 ywsj Video Downloader 启动于 http://0.0.0.0:{port}")

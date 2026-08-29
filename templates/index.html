@@ -515,6 +515,10 @@
         <div class="tabs">
             <div class="tab active" onclick="switchTab('tasks')" id="tabTasks">📥 下载队列</div>
             <div class="tab" onclick="switchTab('files')" id="tabFiles">📁 已下载文件</div>
+            <div style="margin-left:auto;display:flex;gap:0.5rem;">
+                <button class="task-btn" onclick="clearTasks()" title="清除已完成/取消/失败的任务记录">🧹 清理记录</button>
+                <button class="task-btn danger" onclick="clearCache()" title="删除所有临时文件+清除失效任务">🗑 清除缓存</button>
+            </div>
         </div>
 
         <div id="taskListPanel" class="task-list"></div>
@@ -855,6 +859,41 @@ function showToast(msg, type = '') {
         toast.style.animation = 'slideIn 0.3s ease reverse';
         setTimeout(() => toast.remove(), 300);
     }, 2500);
+}
+
+// === Clear Cache ===
+async function clearCache() {
+    if (!confirm('确定清除缓存？\n将删除所有 .part 临时文件和已取消/失败的任务记录。\n已完成的视频文件不受影响。')) return;
+    try {
+        const resp = await fetch('/api/clear-cache', { method: 'POST' });
+        if (resp.status === 401) { showLogin(); return; }
+        const data = await resp.json();
+        if (data.status === 'ok') {
+            const msg = `✅ 清理完成\n删除 ${data.files_count} 个临时文件, 释放 ${data.freed_space}\n清除 ${data.tasks_count} 条任务记录`;
+            showToast(msg, 'success');
+            fetchTasks();
+            fetchFiles();
+        } else {
+            showToast(data.error || '清理失败', 'error');
+        }
+    } catch(e) {
+        showToast('请求失败: ' + e.message, 'error');
+    }
+}
+
+async function clearTasks() {
+    if (!confirm('确定清理任务记录？\n将清除已完成/取消/失败的任务记录，不影响已下载文件。')) return;
+    try {
+        const resp = await fetch('/api/clear-tasks', { method: 'POST' });
+        if (resp.status === 401) { showLogin(); return; }
+        const data = await resp.json();
+        if (data.status === 'ok') {
+            showToast(`已清除 ${data.count} 条任务记录`, 'success');
+            fetchTasks();
+        }
+    } catch(e) {
+        showToast('请求失败: ' + e.message, 'error');
+    }
 }
 
 // === Init ===
