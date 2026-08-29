@@ -1,0 +1,4 @@
+flask>=3.0
+gunicorn>=21.0
+yt-dlp>=2026.0
+curl_cffi>=0.16

@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  video-downloader:
+    build: .
+    container_name: video-downloader
+    restart: unless-stopped
+    ports:
+      - "5200:5200"
+    volumes:
+      - ./downloads:/app/downloads
+      - ./templates:/app/templates
+    environment:
+      - PORT=5200
+    # yt-dlp needs larger tmp space for merging
+    tmpfs:
+      - /tmp:size=2G
