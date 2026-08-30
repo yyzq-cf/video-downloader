@@ -180,6 +180,14 @@
             gap: 0.3rem;
         }
         .btn-icon-header:hover { color: var(--text-primary); border-color: var(--accent); }
+        .github-link {
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            transition: color 0.2s;
+        }
+        .github-link:hover { color: var(--accent); }
+        .github-link svg { width: 22px; height: 22px; fill: currentColor; }
 
         /* === Main === */
         .container { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; }
@@ -497,6 +505,9 @@
         <div class="logo">
             <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.11 0-2 .89-2 2v12a2 2 0 002 2h5l1 1h4l1-1h5a2 2 0 002-2V5a2 2 0 00-2-2zm-8 13v-3h4l-4-5v3H9l4 5z"/></svg>
             <h1>ywsj Video Downloader</h1>
+            <a href="https://github.com/yyzq-cf/video-downloader" target="_blank" class="github-link" title="GitHub 项目地址" style="margin-left:0.5rem;">
+                <svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            </a>
         </div>
         <div class="login-error" id="loginError"></div>
         <div class="login-field">
@@ -526,6 +537,9 @@
             </div>
             <div class="user-menu">
                 <span class="user-name" id="userNameDisplay"></span>
+                <a href="https://github.com/yyzq-cf/video-downloader" target="_blank" class="github-link" title="GitHub 项目地址">
+                    <svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                </a>
                 <button class="btn-icon-header" onclick="toggleTheme()" id="themeToggle" title="切换主题">🌙</button>
                 <button class="btn-icon-header" onclick="showAccountModal()">⚙ 账户</button>
             </div>
