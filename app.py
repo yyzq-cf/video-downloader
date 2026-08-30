@@ -641,10 +641,15 @@ def delete_file(filename):
 @app.route('/api/stream-download', methods=['POST'])
 @login_required
 def stream_download():
-    """流式直传: yt-dlp 输出到 stdout, 直接转发给浏览器, 不存服务器硬盘"""
+    """流式直传: yt-dlp 输出到 stdout, 直接转发给浏览器, 不存服务器硬盘
+    支持 JSON 和表单 POST。表单方式触发浏览器原生下载条。"""
     from flask import Response, stream_with_context
 
-    data = request.json or {}
+    if request.is_json:
+        data = request.json or {}
+    else:
+        data = request.form.to_dict()
+
     url = data.get('url', '').strip()
     if not url:
         return jsonify({'error': '请输入 URL'}), 400
