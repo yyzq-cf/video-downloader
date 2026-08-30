@@ -730,7 +730,7 @@ def delete_file(filename):
 def stream_download():
     """流式直传: yt-dlp 输出到 stdout, 直接转发给浏览器, 不存服务器硬盘
     支持 JSON 和表单 POST。表单方式触发浏览器原生下载条。"""
-    from flask import Response, stream_with_context
+    from flask import Response
 
     if request.is_json:
         data = request.json or {}
@@ -766,46 +766,62 @@ def stream_download():
         ext = 'mp4'
     cmd.append(url)
 
-    def generate():
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=str(DOWNLOAD_DIR),
-        )
-        try:
-            while True:
-                chunk = proc.stdout.read(8192)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            proc.stdout.close()
-            proc.wait()
-
+    # 先用 yt-dlp 获取标题和大小
     title = 'video'
+    content_length = None
     try:
         info_proc = subprocess.run(
-            ['yt-dlp', '--extractor-args', 'generic:impersonate', '--print', 'title', url],
-            capture_output=True, text=True, timeout=30, cwd=str(DOWNLOAD_DIR)
+            ['yt-dlp', '--extractor-args', 'generic:impersonate', '-J', url],
+            capture_output=True, text=True, timeout=60, cwd=str(DOWNLOAD_DIR)
         )
-        if info_proc.stdout.strip():
-            title = sanitize_filename(info_proc.stdout.strip().split('\n')[0])
+        if info_proc.stdout:
+            info = json.loads(info_proc.stdout)
+            title = sanitize_filename(info.get('title', 'video') or 'video')
+            if info.get('filesize'):
+                content_length = int(info['filesize'])
+            elif info.get('filesize_approx'):
+                content_length = int(info['filesize_approx'])
+            else:
+                total = 0
+                for f in info.get('requested_formats', []):
+                    total += f.get('filesize') or f.get('filesize_approx') or 0
+                if total > 0:
+                    content_length = total
     except Exception:
         pass
 
     download_name = f"{title}.{ext}"
-    # RFC 5987 编码文件名, 支持中文/特殊字符, 避免 Invalid HTTP Header 502
     from urllib.parse import quote
     encoded_name = quote(download_name)
-    return Response(
-        stream_with_context(generate()),
-        mimetype='application/octet-stream',
-        headers={
-            'Content-Disposition': f"attachment; filename=\"{encoded_name}\"; filename*=UTF-8''{encoded_name}",
-            'Cache-Control': 'no-cache',
-        }
-    )
+
+    from urllib.parse import quote
+    encoded_name = quote(download_name)
+
+    # 下载到临时文件再发送: send_file 会设置 Content-Length, Chrome 显示进度条
+    import tempfile
+    tmp_path = tempfile.mktemp(suffix=f'.{ext}', dir='/tmp')
+    cmd_dl = [c for c in cmd if c != url]
+    cmd_dl.extend(['-o', tmp_path])
+    cmd_dl.append(url)
+    try:
+        subprocess.run(cmd_dl, capture_output=True, timeout=600, cwd=str(DOWNLOAD_DIR))
+        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+            resp = send_file(
+                tmp_path,
+                as_attachment=True,
+                download_name=download_name,
+                mimetype='application/octet-stream',
+            )
+            # 发送后删除临时文件
+            import atexit
+            atexit.register(lambda: os.path.exists(tmp_path) and os.unlink(tmp_path))
+            return resp
+        else:
+            return jsonify({'error': '下载失败: 文件为空'}), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': '下载超时'}), 500
+    except Exception as e:
+        return jsonify({'error': f'下载失败: {str(e)}'}), 500
 
 
 @app.route('/api/clear-cache', methods=['POST'])
