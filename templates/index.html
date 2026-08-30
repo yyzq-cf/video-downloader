@@ -934,9 +934,11 @@ async function fetchTasks() {
         }
         let actions = '';
         if (t.status === 'downloading') {
-            actions = `<button class="task-btn" onclick="pauseTask('${t.id}')">⏸ 暂停</button><button class="task-btn danger" onclick="cancelTask('${t.id}')">取消</button>`;
+            const previewBtn = t.output_file ? `<button class="task-btn" onclick="playFile('${encodeURIComponent(t.output_file)}')" title="边下边播">▶ 试播</button>` : '';
+            actions = `${previewBtn}<button class="task-btn" onclick="pauseTask('${t.id}')">⏸ 暂停</button><button class="task-btn danger" onclick="cancelTask('${t.id}')">取消</button>`;
         } else if (t.status === 'paused') {
-            actions = `<button class="task-btn" onclick="resumeTask('${t.id}')" style="color:var(--success);border-color:var(--success)">▶ 继续</button><button class="task-btn danger" onclick="cancelTask('${t.id}')">取消</button>`;
+            const previewBtn = t.output_file ? `<button class="task-btn" onclick="playFile('${encodeURIComponent(t.output_file)}')" title="边下边播">▶ 试播</button>` : '';
+            actions = `${previewBtn}<button class="task-btn" onclick="resumeTask('${t.id}')" style="color:var(--success);border-color:var(--success)">▶ 继续</button><button class="task-btn danger" onclick="cancelTask('${t.id}')">取消</button>`;
         } else if (t.status === 'queued' || t.status === 'merging') {
             actions = `<button class="task-btn danger" onclick="cancelTask('${t.id}')">取消</button>`;
         } else if (t.status === 'completed' && t.output_file) {

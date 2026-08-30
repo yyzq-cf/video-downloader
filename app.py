@@ -706,11 +706,17 @@ def download_file(filename):
 @login_required
 def stream_file(filename):
     filepath = DOWNLOAD_DIR / filename
+    # 边下边播: 如果正式文件不存在, 尝试 .part 文件
     if not filepath.exists():
-        return jsonify({'error': '文件不存在'}), 404
+        part_path = DOWNLOAD_DIR / (filename + '.part')
+        if part_path.exists():
+            filepath = part_path
+        else:
+            return jsonify({'error': '文件不存在'}), 404
 
     mime_type, _ = mimetypes.guess_type(str(filepath))
-    return send_file(str(filepath), mimetype=mime_type)
+    # conditional=True 支持 HTTP Range 请求, 允许边下边播和拖动进度条
+    return send_file(str(filepath), mimetype=mime_type, conditional=True)
 
 
 @app.route('/api/file/<path:filename>', methods=['DELETE'])
