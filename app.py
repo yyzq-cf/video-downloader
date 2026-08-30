@@ -237,6 +237,55 @@ def parse_ytdlp_progress(line):
     return None
 
 
+def extract_real_video_url(url):
+    """从网页中智能提取真实视频地址(m3u8/mp4), 支持 MacCMS 等播放器"""
+    try:
+        from curl_cffi import requests as cffi_requests
+        r = cffi_requests.get(url, impersonate='chrome', timeout=30)
+        if r.status_code != 200:
+            return None
+        html = r.text
+
+        # 1. MacCMS player_aaaa 变量中的 m3u8/url
+        m = re.search(r'player_aaaa\s*=\s*(\{[^}]+\})', html)
+        if m:
+            import json as _json
+            try:
+                pdata = _json.loads(m.group(1))
+                vurl = pdata.get('url', '')
+                if vurl and ('m3u8' in vurl or '.mp4' in vurl):
+                    return vurl.replace('\\/', '/').replace('\/', '/')
+            except Exception:
+                pass
+
+        # 2. 直接搜索 m3u8 链接
+        m3u8_matches = re.findall(r'[\'\"\']([^\'\"\' ]*m3u8[^\'\"\' ]*)[\'\"\']', html)
+        for u in m3u8_matches:
+            u = u.replace('\\/', '/').replace('\/', '/')
+            if u.startswith('http'):
+                return u
+
+        # 3. 搜索 mp4 直链
+        mp4_matches = re.findall(r'[\'\"\'](https?://[^\'\"\' ]+\.mp4[^\'\"\' ]*)[\'\"\']', html)
+        for u in mp4_matches:
+            u = u.replace('\\/', '/').replace('\/', '/')
+            return u
+
+        # 4. 搜索 video 标签 src
+        video_src = re.findall(r'<video[^>]*src=[\'\"\']([^\'\"\' ]+)', html, re.I)
+        for u in video_src:
+            if u.startswith('http'):
+                return u
+
+        # 5. 检查页面是否是 JS 安全验证(内容太短)
+        if len(html) < 3000:
+            return '__JS_CHALLENGE__'
+
+    except Exception:
+        pass
+    return None
+
+
 def run_download(task_id, url, options):
     """在后台线程中运行 yt-dlp"""
     task = tasks[task_id]
@@ -355,23 +404,99 @@ def run_download(task_id, url, options):
         process.wait()
         ret = process.returncode
 
-        with tasks_lock:
-            if ret == 0:
+        # 先释放锁, 再判断结果
+        if ret == 0:
+            with tasks_lock:
                 task['status'] = 'completed'
                 task['percent'] = 100.0
                 task['completed_at'] = time.time()
 
                 # 尝试找到输出文件
                 if 'output_file' not in task or not task['output_file']:
-                    # 查找最近修改的文件
                     files = sorted(DOWNLOAD_DIR.glob('*'), key=lambda f: f.stat().st_mtime, reverse=True)
                     for f in files:
                         if f.is_file() and f.suffix in ['.mp4', '.mkv', '.webm', '.mp3', '.m4a']:
                             task['output_file'] = f.name
                             break
+        else:
+            # yt-dlp 失败: 尝试智能提取真实视频地址后重试 (在锁外执行, 不阻塞API)
+            real_url = extract_real_video_url(url)
+            if real_url and real_url != '__JS_CHALLENGE__' and real_url != url:
+                with tasks_lock:
+                    task['status'] = 'downloading'
+                    task['percent'] = 0
+                    task['error'] = ''
+                    task['output_file'] = ''
+                # 用提取到的真实地址重新构建命令并运行
+                retry_cmd = [c for c in cmd if c != url]
+                retry_cmd.append(real_url)
+                try:
+                    process2 = subprocess.Popen(
+                        retry_cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        cwd=str(DOWNLOAD_DIR),
+                    )
+                    with tasks_lock:
+                        task['pid'] = process2.pid
+                        task['process'] = process2
+                    for line2 in process2.stdout:
+                        line2 = line2.strip()
+                        if not line2:
+                            continue
+                        if line2.startswith('P|'):
+                            parts2 = line2.split('|')
+                            if len(parts2) >= 7:
+                                with tasks_lock:
+                                    pct_s = parts2[1].strip().replace('%', '')
+                                    try:
+                                        task['percent'] = float(pct_s)
+                                    except ValueError:
+                                        pass
+                                    task['total_size'] = parts2[2].strip() if parts2[2] != 'NA' else ''
+                                    task['speed'] = parts2[3].strip() if parts2[3] != 'NA' else ''
+                                    task['eta'] = parts2[4].strip() if parts2[4] != 'NA' else ''
+                        if '[Merger]' in line2 or '[ffmpeg]' in line2:
+                            with tasks_lock:
+                                task['status'] = 'merging'
+                                task['percent'] = 100.0
+                        m_fn = re.search(r'\[(?:Merger|download)\].*?"([^"]+)"', line2)
+                        if m_fn:
+                            with tasks_lock:
+                                task['output_file'] = m_fn.group(1)
+                        m_dest = re.search(r'\[download\]\s+Destination:\s+(.+)', line2)
+                        if m_dest:
+                            with tasks_lock:
+                                task['output_file'] = m_dest.group(1).strip()
+                    process2.wait()
+                    ret2 = process2.returncode
+                    with tasks_lock:
+                        if ret2 == 0:
+                            task['status'] = 'completed'
+                            task['percent'] = 100.0
+                            task['completed_at'] = time.time()
+                            if not task.get('output_file'):
+                                files = sorted(DOWNLOAD_DIR.glob('*'), key=lambda f: f.stat().st_mtime, reverse=True)
+                                for f in files:
+                                    if f.is_file() and f.suffix in ['.mp4', '.mkv', '.webm', '.mp3', '.m4a']:
+                                        task['output_file'] = f.name
+                                        break
+                        else:
+                            task['status'] = 'failed'
+                            task['error'] = f'智能提取后下载仍失败 (退出码 {ret2})'
+                except Exception as e2:
+                    with tasks_lock:
+                        task['status'] = 'failed'
+                        task['error'] = f'重试失败: {str(e2)}'
+            elif real_url == '__JS_CHALLENGE__':
+                with tasks_lock:
+                    task['status'] = 'failed'
+                    task['error'] = '该网站需要 JS 安全验证, yt-dlp 无法直接下载 (如论坛等)'
             else:
-                task['status'] = 'failed'
-                task['error'] = f'yt-dlp 退出码 {ret}'
+                with tasks_lock:
+                    task['status'] = 'failed'
+                    task['error'] = f'yt-dlp 退出码 {ret}'
 
     except FileNotFoundError:
         with tasks_lock:
