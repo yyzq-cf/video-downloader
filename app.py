@@ -638,6 +638,81 @@ def delete_file(filename):
 
 
 
+@app.route('/api/stream-download', methods=['POST'])
+@login_required
+def stream_download():
+    """流式直传: yt-dlp 输出到 stdout, 直接转发给浏览器, 不存服务器硬盘"""
+    from flask import Response, stream_with_context
+
+    data = request.json or {}
+    url = data.get('url', '').strip()
+    if not url:
+        return jsonify({'error': '请输入 URL'}), 400
+    if not re.match(r'https?://', url):
+        return jsonify({'error': 'URL 格式错误'}), 400
+
+    fmt = data.get('format', 'best')
+    cmd = [
+        'yt-dlp',
+        '--extractor-args', 'generic:impersonate',
+        '--concurrent-fragments', str(int(data.get('concurrent', 10))),
+        '--throttled-rate', '100K',
+        '-o', '-',
+        '--no-part',
+    ]
+    if fmt == 'audio':
+        cmd.extend(['-x', '--audio-format', 'mp3', '--audio-quality', '0'])
+        ext = 'mp3'
+    elif fmt == '720p':
+        cmd.extend(['-f', 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'])
+        ext = 'mp4'
+    elif fmt == '1080p':
+        cmd.extend(['-f', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best'])
+        ext = 'mp4'
+    else:
+        cmd.extend(['-f', 'bestvideo+bestaudio/best'])
+        ext = 'mp4'
+    cmd.append(url)
+
+    def generate():
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=str(DOWNLOAD_DIR),
+        )
+        try:
+            while True:
+                chunk = proc.stdout.read(8192)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            proc.stdout.close()
+            proc.wait()
+
+    title = 'video'
+    try:
+        info_proc = subprocess.run(
+            ['yt-dlp', '--extractor-args', 'generic:impersonate', '--print', 'title', url],
+            capture_output=True, text=True, timeout=30, cwd=str(DOWNLOAD_DIR)
+        )
+        if info_proc.stdout.strip():
+            title = sanitize_filename(info_proc.stdout.strip().split('\n')[0])
+    except Exception:
+        pass
+
+    download_name = f"{title}.{ext}"
+    return Response(
+        stream_with_context(generate()),
+        mimetype='application/octet-stream',
+        headers={
+            'Content-Disposition': f'attachment; filename="{download_name}"',
+            'Cache-Control': 'no-cache',
+        }
+    )
+
+
 @app.route('/api/clear-cache', methods=['POST'])
 @login_required
 def clear_cache():
