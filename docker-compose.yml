@@ -7,7 +7,6 @@ services:
       - "5200:5200"
     volumes:
       - ./downloads:/app/downloads
-      - ./templates:/app/templates
       - ./data:/app/data
     environment:
       - PORT=5200
