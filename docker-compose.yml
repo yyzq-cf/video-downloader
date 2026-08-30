@@ -1,8 +1,6 @@
-version: "3.8"
-
 services:
   video-downloader:
-    build: .
+    image: ywsj/video-downloader:latest
     container_name: video-downloader
     restart: unless-stopped
     ports:
@@ -16,6 +14,5 @@ services:
       - AUTH_USERNAME=admin
       - AUTH_PASSWORD=admin123
       - SECRET_KEY=change-me-to-a-random-string
-    # yt-dlp needs larger tmp space for merging
     tmpfs:
       - /tmp:size=2G
