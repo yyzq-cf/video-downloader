@@ -343,6 +343,9 @@
         .progress-fill.completed::after { display: none; }
         .progress-fill.failed { background: linear-gradient(90deg, var(--error), #c0392b); }
         .progress-fill.failed::after { display: none; }
+        .progress-fill.paused { background: linear-gradient(90deg, #3498db, #2980b9); }
+        .progress-fill.paused::after { display: none; }
+        .progress-fill.failed::after { display: none; }
         .task-info { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; }
         .task-stats { display: flex; gap: 1rem; color: var(--text-secondary); }
         .task-stats span { display: flex; align-items: center; gap: 0.25rem; }
@@ -353,6 +356,7 @@
         .status-completed { background: rgba(46,204,113,0.2); color: var(--success); }
         .status-failed { background: rgba(231,76,60,0.2); color: var(--error); }
         .status-cancelled { background: rgba(93,109,126,0.2); color: var(--text-muted); }
+        .status-paused { background: rgba(52,152,219,0.2); color: #3498db; }
 
         /* File List */
         .file-list { display: flex; flex-direction: column; gap: 0.6rem; }
@@ -900,6 +904,7 @@ async function fetchTasks() {
     container.innerHTML = tasks.map(t => {
         const pct = t.percent || 0;
         const statusClass = t.status || 'queued';
+        const statusLabel = {'queued':'等待','downloading':'下载中','paused':'已暂停','merging':'合并中','completed':'已完成','failed':'失败','cancelled':'已取消'}[statusClass] || statusClass;
         let stats = '';
         if (t.status === 'downloading') {
             activeTasks.add(t.id);
@@ -916,20 +921,30 @@ async function fetchTasks() {
             stats = `❌ ${t.error || '下载失败'}`;
         } else if (t.status === 'merging') {
             stats = '🔄 正在合并...';
+        } else if (t.status === 'paused') {
+            const parts = [];
+            if (t.total_size) parts.push(`📦 ${t.total_size}`);
+            if (t.frag_total) parts.push(`🧩 ${t.frag_current||0}/${t.frag_total}`);
+            if (t.elapsed) parts.push(`⏳ ${t.elapsed}`);
+            stats = '⏸ 已暂停  ' + parts.join('  ');
         } else if (t.status === 'cancelled') {
             stats = '🚫 已取消';
         } else {
             stats = '⏳ 等待中...';
         }
         let actions = '';
-        if (t.status === 'downloading' || t.status === 'queued' || t.status === 'merging') {
+        if (t.status === 'downloading') {
+            actions = `<button class="task-btn" onclick="pauseTask('${t.id}')">⏸ 暂停</button><button class="task-btn danger" onclick="cancelTask('${t.id}')">取消</button>`;
+        } else if (t.status === 'paused') {
+            actions = `<button class="task-btn" onclick="resumeTask('${t.id}')" style="color:var(--success);border-color:var(--success)">▶ 继续</button><button class="task-btn danger" onclick="cancelTask('${t.id}')">取消</button>`;
+        } else if (t.status === 'queued' || t.status === 'merging') {
             actions = `<button class="task-btn danger" onclick="cancelTask('${t.id}')">取消</button>`;
         } else if (t.status === 'completed' && t.output_file) {
             actions = `<button class="task-btn" onclick="playFile('${encodeURIComponent(t.output_file)}')">▶ 播放</button><button class="task-btn" onclick="downloadFile('${encodeURIComponent(t.output_file)}')">⬇ 保存</button><button class="task-btn danger" onclick="deleteTask('${t.id}')">删除</button>`;
         } else if (t.status === 'failed' || t.status === 'cancelled') {
-            actions = `<button class="task-btn danger" onclick="deleteTask('${t.id}')">删除</button>`;
+            actions = `<button class="task-btn" onclick="retryTask('${t.id}')" style="color:var(--success);border-color:var(--success)">🔄 重试</button><button class="task-btn danger" onclick="deleteTask('${t.id}')">删除</button>`;
         }
-        return `<div class="task-item"><div class="task-header"><div class="task-url" title="${t.url}">${t.url}</div><div class="task-actions">${actions}</div></div><div class="progress-container"><div class="progress-bar"><div class="progress-fill ${t.status}" style="width:${pct}%"></div><span class="progress-text">${pct.toFixed(1)}%</span></div><span class="progress-percent">${pct.toFixed(1)}%</span></div><div class="task-info"><span class="status-badge status-${statusClass}">${statusClass}</span><span class="task-stats">${stats}</span></div></div>`;
+        return `<div class="task-item"><div class="task-header"><div class="task-url" title="${t.url}">${t.url}</div><div class="task-actions">${actions}</div></div><div class="progress-container"><div class="progress-bar"><div class="progress-fill ${t.status}" style="width:${pct}%"></div><span class="progress-text">${pct.toFixed(1)}%</span></div><span class="progress-percent">${pct.toFixed(1)}%</span></div><div class="task-info"><span class="status-badge status-${statusClass}">${statusLabel}</span><span class="task-stats">${stats}</span></div></div>`;
     }).join('');
     updateStats(tasks.length, null);
     // Auto-download completed tasks
@@ -940,13 +955,40 @@ async function fetchTasks() {
             showToast('下载完成,自动开始传输到本地: ' + t.output_file, 'success');
         }
     });
-    if (activeTasks.size === 0 && pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+    // Keep polling if any downloading/paused tasks
+    let hasActive = false;
+    tasks.forEach(t => {
+        if (t.status === 'downloading' || t.status === 'paused' || t.status === 'queued' || t.status === 'merging') {
+            hasActive = true;
+        }
+    });
+    if (!hasActive && pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
 }
 
 async function cancelTask(id) {
     await fetch(`/api/cancel/${id}`, { method: 'POST' });
     showToast('任务已取消', 'success');
     fetchTasks();
+}
+async function pauseTask(id) {
+    const resp = await fetch(`/api/pause/${id}`, { method: 'POST' });
+    if (resp.ok) { showToast('已暂停', 'success'); fetchTasks(); }
+    else { showToast('暂停失败', 'error'); }
+}
+async function resumeTask(id) {
+    const resp = await fetch(`/api/resume/${id}`, { method: 'POST' });
+    if (resp.ok) { showToast('已继续下载', 'success'); fetchTasks(); startPolling(); }
+    else { showToast('继续失败', 'error'); }
+}
+async function retryTask(id) {
+    const resp = await fetch(`/api/retry/${id}`, { method: 'POST' });
+    if (resp.ok) {
+        const data = await resp.json();
+        showToast('已重新开始下载', 'success');
+        activeTasks.add(data.task_id);
+        startPolling();
+        fetchTasks();
+    } else { showToast('重试失败', 'error'); }
 }
 async function deleteTask(id) {
     await fetch(`/api/delete/${id}`, { method: 'POST' });

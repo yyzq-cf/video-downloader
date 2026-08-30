@@ -570,6 +570,93 @@ def cancel_download(task_id):
     return jsonify({'error': '无法取消任务'}), 400
 
 
+@app.route('/api/pause/<task_id>', methods=['POST'])
+@login_required
+def pause_download(task_id):
+    """暂停下载: 发送 SIGSTOP 暂停 yt-dlp 进程"""
+    import signal
+    with tasks_lock:
+        task = tasks.get(task_id)
+    if not task:
+        return jsonify({'error': '任务不存在'}), 404
+    if 'process' in task and task['process']:
+        try:
+            task['process'].send_signal(signal.SIGSTOP)
+            task['status'] = 'paused'
+            return jsonify({'status': 'paused'})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    return jsonify({'error': '无法暂停任务'}), 400
+
+
+@app.route('/api/resume/<task_id>', methods=['POST'])
+@login_required
+def resume_download(task_id):
+    """继续下载: 发送 SIGCONT 恢复 yt-dlp 进程"""
+    import signal
+    with tasks_lock:
+        task = tasks.get(task_id)
+    if not task:
+        return jsonify({'error': '任务不存在'}), 404
+    if 'process' in task and task['process']:
+        try:
+            task['process'].send_signal(signal.SIGCONT)
+            task['status'] = 'downloading'
+            return jsonify({'status': 'downloading'})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    return jsonify({'error': '无法继续任务'}), 400
+
+
+@app.route('/api/retry/<task_id>', methods=['POST'])
+@login_required
+def retry_download(task_id):
+    """重试: 用原 URL 和选项重新下载"""
+    with tasks_lock:
+        task = tasks.get(task_id)
+    if not task:
+        return jsonify({'error': '任务不存在'}), 404
+
+    # 如果还在运行, 先取消
+    if 'process' in task and task['process']:
+        try:
+            task['process'].terminate()
+        except Exception:
+            pass
+
+    # 用原参数重新启动
+    url = task['url']
+    options = {'format': task.get('format', 'best'), 'concurrent': task.get('concurrent', 10)}
+
+    new_task_id = str(uuid.uuid4())[:8]
+    with tasks_lock:
+        # 删除旧任务
+        if task_id in tasks:
+            del tasks[task_id]
+        tasks[new_task_id] = {
+            'id': new_task_id,
+            'url': url,
+            'status': 'queued',
+            'percent': 0,
+            'speed': '',
+            'eta': '',
+            'total_size': '',
+            'frag_current': 0,
+            'frag_total': 0,
+            'output_file': '',
+            'error': '',
+            'file_size': '',
+            'started_at': None,
+            'completed_at': None,
+            'format': options['format'],
+            'concurrent': options['concurrent'],
+        }
+
+    thread = threading.Thread(target=run_download, args=(new_task_id, url, options), daemon=True)
+    thread.start()
+    return jsonify({'task_id': new_task_id, 'status': 'queued'})
+
+
 @app.route('/api/delete/<task_id>', methods=['POST'])
 @login_required
 def delete_task(task_id):
