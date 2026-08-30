@@ -827,13 +827,20 @@ def stream_download():
 @app.route('/api/clear-cache', methods=['POST'])
 @login_required
 def clear_cache():
-    """清除下载缓存: 删除所有 .part/.ytdl 临时文件, 清除已取消/失败的任务记录"""
+    """清除下载缓存: 删除所有临时文件(.part/.ytdl/--Frag*), 清除已取消/失败的任务记录"""
     deleted_files = []
     freed_bytes = 0
 
-    # 删除临时文件 (.part, .part-Frag*, .ytdl)
+    # 删除临时文件 (.part, .part-Frag*, .ytdl, --Frag*)
     for f in DOWNLOAD_DIR.iterdir():
-        if f.is_file() and (f.name.endswith('.part') or f.name.endswith('.ytdl') or '.part-Frag' in f.name):
+        if f.is_file() and (
+            f.name.endswith('.part') or
+            f.name.endswith('.ytdl') or
+            '.part-Frag' in f.name or
+            '--Frag' in f.name or
+            f.name.startswith('--Frag') or
+            re.search(r'-Frag\d+$', f.name)
+        ):
             size = f.stat().st_size
             freed_bytes += size
             deleted_files.append(f.name)
