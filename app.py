@@ -795,11 +795,14 @@ def stream_download():
         pass
 
     download_name = f"{title}.{ext}"
+    # RFC 5987 编码文件名, 支持中文/特殊字符, 避免 Invalid HTTP Header 502
+    from urllib.parse import quote
+    encoded_name = quote(download_name)
     return Response(
         stream_with_context(generate()),
         mimetype='application/octet-stream',
         headers={
-            'Content-Disposition': f'attachment; filename="{download_name}"',
+            'Content-Disposition': f"attachment; filename=\"{encoded_name}\"; filename*=UTF-8''{encoded_name}",
             'Cache-Control': 'no-cache',
         }
     )
