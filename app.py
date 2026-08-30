@@ -250,16 +250,16 @@ def run_download(task_id, url, options):
         '-o', str(DOWNLOAD_DIR / '%(title)s.%(ext)s'),
     ]
 
-    # 格式选择
+    # 格式选择 — 优先选最佳视频+音频合并，回退到预合并单文件
     fmt = options.get('format', 'best')
     if fmt == 'audio':
         cmd.extend(['-x', '--audio-format', 'mp3', '--audio-quality', '0'])
     elif fmt == '720p':
-        cmd.extend(['-f', 'best[height<=720]/best'])
+        cmd.extend(['-f', 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'])
     elif fmt == '1080p':
-        cmd.extend(['-f', 'best[height<=1080]/best'])
+        cmd.extend(['-f', 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best'])
     else:
-        cmd.extend(['-f', 'best'])
+        cmd.extend(['-f', 'bestvideo+bestaudio/best'])
 
     # 并发下载
     concurrent = int(options.get('concurrent', 10))
@@ -314,6 +314,12 @@ def run_download(task_id, url, options):
                                 task['frag_total'] = int(frag_total)
                             except ValueError:
                                 pass
+
+            # 检测错误
+            if line.startswith("ERROR:") or line.startswith("ffmpeg error"):
+                with tasks_lock:
+                    task["error"] = line.replace("ERROR:", "").replace("ffmpeg error", "").strip()
+                    task["status"] = "failed"
 
             # 检测合并/完成状态
             if '[Merger]' in line or '[ffmpeg]' in line:
