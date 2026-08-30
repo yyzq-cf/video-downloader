@@ -33,5 +33,6 @@ EXPOSE 5200
 ENV AUTH_USERNAME=admin
 ENV AUTH_PASSWORD=admin123
 
-# Gunicorn with threaded workers
-CMD ["gunicorn", "--bind", "0.0.0.0:5200", "--workers", "2", "--threads", "4", "--timeout", "600", "app:app"]
+# Single worker + multiple threads: tasks dict lives in-process memory,
+# must be shared across all requests (download threads + polling)
+CMD ["gunicorn", "--bind", "0.0.0.0:5200", "--workers", "1", "--threads", "8", "--timeout", "600", "app:app"]
