@@ -254,21 +254,21 @@ def extract_real_video_url(url):
                 pdata = _json.loads(m.group(1))
                 vurl = pdata.get('url', '')
                 if vurl and ('m3u8' in vurl or '.mp4' in vurl):
-                    return vurl.replace('\\/', '/').replace('\/', '/')
+                    return vurl.replace(chr(92)+chr(47), '/')
             except Exception:
                 pass
 
         # 2. 直接搜索 m3u8 链接
         m3u8_matches = re.findall(r'[\'\"\']([^\'\"\' ]*m3u8[^\'\"\' ]*)[\'\"\']', html)
         for u in m3u8_matches:
-            u = u.replace('\\/', '/').replace('\/', '/')
+            u = u.replace(chr(92)+chr(47), '/')
             if u.startswith('http'):
                 return u
 
         # 3. 搜索 mp4 直链
         mp4_matches = re.findall(r'[\'\"\'](https?://[^\'\"\' ]+\.mp4[^\'\"\' ]*)[\'\"\']', html)
         for u in mp4_matches:
-            u = u.replace('\\/', '/').replace('\/', '/')
+            u = u.replace(chr(92)+chr(47), '/')
             return u
 
         # 4. 搜索 video 标签 src
