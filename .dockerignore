@@ -1,0 +1,6 @@
+downloads/
+data/
+*.pyc
+__pycache__/
+.git/
+.gitignore

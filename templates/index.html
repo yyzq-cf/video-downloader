@@ -294,14 +294,33 @@
         .task-btn.danger:hover { color: var(--error); border-color: var(--error); }
 
         /* Progress */
-        .progress-container { margin-bottom: 0.5rem; }
-        .progress-bar { height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; position: relative; }
+        .progress-container { margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.6rem; }
+        .progress-bar { flex: 1; height: 22px; background: var(--bg-input); border-radius: 6px; overflow: hidden; position: relative; }
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, var(--accent), #ff8c42);
-            border-radius: 4px;
+            border-radius: 6px;
             transition: width 0.3s;
             position: relative;
+        }
+        .progress-text {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            z-index: 1;
+            pointer-events: none;
+        }
+        .progress-percent {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            min-width: 3.5rem;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
         }
         .progress-fill::after {
             content: '';
@@ -849,7 +868,7 @@ async function fetchTasks() {
         } else if (t.status === 'failed' || t.status === 'cancelled') {
             actions = `<button class="task-btn danger" onclick="deleteTask('${t.id}')">删除</button>`;
         }
-        return `<div class="task-item"><div class="task-header"><div class="task-url" title="${t.url}">${t.url}</div><div class="task-actions">${actions}</div></div><div class="progress-container"><div class="progress-bar"><div class="progress-fill ${t.status}" style="width:${pct}%"></div></div></div><div class="task-info"><span class="status-badge status-${statusClass}">${statusClass}</span><span class="task-stats">${stats}</span></div></div>`;
+        return `<div class="task-item"><div class="task-header"><div class="task-url" title="${t.url}">${t.url}</div><div class="task-actions">${actions}</div></div><div class="progress-container"><div class="progress-bar"><div class="progress-fill ${t.status}" style="width:${pct}%"></div><span class="progress-text">${pct.toFixed(1)}%</span></div><span class="progress-percent">${pct.toFixed(1)}%</span></div><div class="task-info"><span class="status-badge status-${statusClass}">${statusClass}</span><span class="task-stats">${stats}</span></div></div>`;
     }).join('');
     updateStats(tasks.length, null);
     // Auto-download completed tasks
