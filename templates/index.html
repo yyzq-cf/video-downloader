@@ -485,6 +485,35 @@
         }
         .btn-logout:hover { background: rgba(231,76,60,0.1); }
 
+        /* Download choice modal */
+        .choice-modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: var(--shadow-strong);
+        }
+        .choice-modal h2 { font-size: 1.1rem; margin-bottom: 0.5rem; text-align: center; }
+        .choice-modal .choice-subtitle { font-size: 0.82rem; color: var(--text-secondary); text-align: center; margin-bottom: 1.5rem; }
+        .choice-options { display: flex; flex-direction: column; gap: 0.75rem; }
+        .choice-btn {
+            display: flex; align-items: center; gap: 1rem;
+            background: var(--bg-input);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+        .choice-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+        .choice-btn .choice-icon { font-size: 1.8rem; flex-shrink: 0; }
+        .choice-btn .choice-text { flex: 1; }
+        .choice-btn .choice-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem; }
+        .choice-btn .choice-desc { font-size: 0.78rem; color: var(--text-secondary); }
+
         /* Card shadows via theme variable */
         .download-card, .task-item, .file-item, .account-modal, .modal-content, .toast { box-shadow: var(--shadow); }
 
@@ -576,18 +605,7 @@
                         <option value="16">16 线程</option>
                         <option value="20">20 线程</option>
                     </select>
-                <div class="option-group">
-                    <label>模式</label>
-                    <select id="modeSelect" onchange="onModeChange()">
-                        <option value="server" selected>🖥 存服务器</option>
-                        <option value="stream">📥 直传本地</option>
-                    </select>
-                </div>
-                <div class="option-group" id="autoDlGroup">
-                    <label style="display:flex;align-items:center;gap:0.3rem;cursor:pointer;">
-                        <input type="checkbox" id="autoDownload" checked> 完成后自动下载到本地
-                    </label>
-                </div>
+
                 </div>
             </div>
         </div>
@@ -603,6 +621,33 @@
 
         <div id="taskListPanel" class="task-list"></div>
         <div id="fileListPanel" class="file-list" style="display:none;"></div>
+    </div>
+</div>
+
+<!-- Download Choice Modal -->
+<div class="modal" id="choiceModal" onclick="closeChoiceModal(event)">
+    <div class="choice-modal">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+            <h2>选择下载方式</h2>
+            <button class="modal-close" style="position:static;" onclick="closeChoiceModal()">&times;</button>
+        </div>
+        <p class="choice-subtitle">请选择视频下载到哪里</p>
+        <div class="choice-options">
+            <div class="choice-btn" onclick="confirmDownload('server')">
+                <span class="choice-icon">🖥</span>
+                <div class="choice-text">
+                    <div class="choice-title">存到服务器</div>
+                    <div class="choice-desc">下载到服务器硬盘，支持在线播放，完成后自动传输到本地</div>
+                </div>
+            </div>
+            <div class="choice-btn" onclick="confirmDownload('stream')">
+                <span class="choice-icon">📥</span>
+                <div class="choice-text">
+                    <div class="choice-title">直传到本地</div>
+                    <div class="choice-desc">视频流式传输直接到浏览器，服务器不存文件，零磁盘占用</div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -760,16 +805,26 @@ async function doChangeUsername() {
 }
 
 // === Download ===
-async function startDownload() {
+function startDownload() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) { showToast('请输入 URL', 'error'); return; }
+    document.getElementById('choiceModal').classList.add('active');
+}
+
+function closeChoiceModal(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('choiceModal').classList.remove('active');
+}
+
+async function confirmDownload(mode) {
     const url = document.getElementById('urlInput').value.trim();
     const format = document.getElementById('formatSelect').value;
     const concurrent = document.getElementById('concurrentSelect').value;
-    const mode = document.getElementById('modeSelect').value;
-    if (!url) { showToast('请输入 URL', 'error'); return; }
-    const btn = document.getElementById('btnStart');
-    
+    closeChoiceModal();
+
     if (mode === 'stream') {
-        // 流式直传: 浏览器直接下载, 不存服务器
+        // Stream directly to browser, no server storage
+        const btn = document.getElementById('btnStart');
         btn.disabled = true;
         btn.textContent = '下载中...';
         try {
@@ -779,16 +834,14 @@ async function startDownload() {
                 body: JSON.stringify({ url, format, concurrent: parseInt(concurrent) })
             });
             if (resp.status === 401) { showLogin(); return; }
-            if (!resp.ok) { 
+            if (!resp.ok) {
                 const err = await resp.json().catch(() => ({error: '下载失败'}));
-                showToast(err.error || '下载失败', 'error'); 
-                return; 
+                showToast(err.error || '下载失败', 'error');
+                return;
             }
-            // 从 Content-Disposition 提取文件名
             const cd = resp.headers.get('Content-Disposition') || '';
             const m = cd.match(/filename="(.+?)"/);
             const filename = m ? m[1] : 'video.mp4';
-            // 转为 blob 并触发浏览器下载
             const blob = await resp.blob();
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
@@ -805,37 +858,35 @@ async function startDownload() {
             btn.disabled = false;
             btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>下载';
         }
-        return;
-    }
-    
-    // 服务器模式: 存到服务器硬盘
-    btn.disabled = true;
-    btn.textContent = '提交中...';
-    try {
-        const resp = await fetch('/api/download', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, format, concurrent: parseInt(concurrent) })
-        });
-        if (resp.status === 401) { showLogin(); return; }
-        const data = await resp.json();
-        if (data.error) {
-            showToast(data.error, 'error');
-        } else {
-            showToast('下载任务已创建', 'success');
-            document.getElementById('urlInput').value = '';
-            activeTasks.add(data.task_id);
-            if (document.getElementById('autoDownload').checked) {
+    } else {
+        // Server mode: download to server, auto-transfer to local when done
+        const btn = document.getElementById('btnStart');
+        btn.disabled = true;
+        btn.textContent = '提交中...';
+        try {
+            const resp = await fetch('/api/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, format, concurrent: parseInt(concurrent) })
+            });
+            if (resp.status === 401) { showLogin(); return; }
+            const data = await resp.json();
+            if (data.error) {
+                showToast(data.error, 'error');
+            } else {
+                showToast('下载任务已创建', 'success');
+                document.getElementById('urlInput').value = '';
+                activeTasks.add(data.task_id);
                 autoDownloadTasks.add(data.task_id);
+                startPolling();
+                fetchTasks();
             }
-            startPolling();
-            fetchTasks();
+        } catch (e) {
+            showToast('请求失败: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>下载';
         }
-    } catch (e) {
-        showToast('请求失败: ' + e.message, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>下载';
     }
 }
 
@@ -969,17 +1020,7 @@ function switchTab(tab) {
     if (tab === 'files') fetchFiles();
 }
 
-// === Mode & Auto-Download ===
-let autoDownloadTasks = new Set(); // tasks that should auto-download when complete
-function onModeChange() {
-    const mode = document.getElementById('modeSelect').value;
-    const autoGroup = document.getElementById('autoDlGroup');
-    autoGroup.style.display = mode === 'server' ? 'flex' : 'none';
-    const btn = document.getElementById('btnStart');
-    btn.innerHTML = mode === 'stream' 
-        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>直传下载'
-        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>下载';
-}
+let autoDownloadTasks = new Set();
 
 // === Polling ===
 function startPolling() {
@@ -1063,7 +1104,6 @@ function updateThemeIcon() {
 
 // === Init ===
 updateThemeIcon();
-onModeChange();
 checkAuth();
 </script>
 </body>
