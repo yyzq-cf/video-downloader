@@ -286,17 +286,27 @@ def extract_real_video_url(url):
     return None
 
 
-def run_download(task_id, url, options):
-    """在后台线程中运行 yt-dlp"""
-    task = tasks[task_id]
+def is_tiktok_url(url):
+    """判断是否为 TikTok 链接"""
+    return 'tiktok.com' in url or 'douyin.com' in url
+
+
+def build_ytdlp_cmd(url, options, output_template=None):
+    """构建 yt-dlp 命令行"""
+    if output_template is None:
+        output_template = str(DOWNLOAD_DIR / '%(title)s.%(ext)s')
+
     cmd = [
         'yt-dlp',
+        '--no-check-certificates',
         '--extractor-args', 'generic:impersonate',
         '--newline',
         '--progress',
         '--continue',
+        '--retries', '10',
+        '--fragment-retries', '10',
         '--progress-template', 'P|%(progress._percent_str)s|%(progress._total_bytes_estimate_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress.fragment_index)s|%(progress.fragment_count)s',
-        '-o', str(DOWNLOAD_DIR / '%(title)s.%(ext)s'),
+        '-o', output_template,
     ]
 
     # 格式选择 — 优先选最佳视频+音频合并，回退到预合并单文件
@@ -316,196 +326,229 @@ def run_download(task_id, url, options):
     cmd.extend(['--throttled-rate', '100K'])
 
     cmd.append(url)
+    return cmd
 
+
+def run_download(task_id, url, options):
+    """在后台线程中运行 yt-dlp, 支持 TikTok 重试"""
+    task = tasks[task_id]
+
+    # TikTok 链接需要重试机制: TikTok WAF 不稳定, 有时返回不完整页面
+    is_tiktok = is_tiktok_url(url)
+    max_attempts = 5 if is_tiktok else 1
+
+    cmd = build_ytdlp_cmd(url, options)
     task['status'] = 'downloading'
     task['started_at'] = time.time()
 
-    try:
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            cwd=str(DOWNLOAD_DIR),
-        )
+    download_success = False
+    last_error = ''
 
-        task['pid'] = process.pid
-        task['process'] = process
+    for attempt in range(1, max_attempts + 1):
+        if attempt > 1:
+            with tasks_lock:
+                task['status'] = 'downloading'
+                task['percent'] = 0
+                task['error'] = f'TikTok 重试中 ({attempt}/{max_attempts})...'
+                task['output_file'] = ''
+            time.sleep(3)  # 重试间隔
 
-        last_update = 0
-        for line in process.stdout:
-            line = line.strip()
-            if not line:
-                continue
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=str(DOWNLOAD_DIR),
+            )
 
-            # 解析进度模板行: P|  0.1%|   1.84GiB| 300.89KiB/s|91:13:53|1|2084
-            if line.startswith('P|'):
-                parts = line.split('|')
-                if len(parts) >= 7:
+            task['pid'] = process.pid
+            task['process'] = process
+
+            last_update = 0
+            for line in process.stdout:
+                line = line.strip()
+                if not line:
+                    continue
+
+                # 解析进度模板行: P|  0.1%|   1.84GiB| 300.89KiB/s|91:13:53|1|2084
+                if line.startswith('P|'):
+                    parts = line.split('|')
+                    if len(parts) >= 7:
+                        with tasks_lock:
+                            pct_str = parts[1].strip().replace('%', '')
+                            try:
+                                task['percent'] = float(pct_str)
+                            except ValueError:
+                                pass
+                            task['total_size'] = parts[2].strip() if parts[2] != 'NA' else ''
+                            task['speed'] = parts[3].strip() if parts[3] != 'NA' else ''
+                            task['eta'] = parts[4].strip() if parts[4] != 'NA' else ''
+                            frag_cur = parts[5].strip()
+                            frag_total = parts[6].strip()
+                            if frag_cur and frag_cur != 'NA':
+                                try:
+                                    task['frag_current'] = int(frag_cur)
+                                except ValueError:
+                                    pass
+                            if frag_total and frag_total != 'NA':
+                                try:
+                                    task['frag_total'] = int(frag_total)
+                                except ValueError:
+                                    pass
+
+                # 检测错误
+                if line.startswith("ERROR:") or line.startswith("ffmpeg error"):
                     with tasks_lock:
-                        pct_str = parts[1].strip().replace('%', '')
-                        try:
-                            task['percent'] = float(pct_str)
-                        except ValueError:
-                            pass
-                        task['total_size'] = parts[2].strip() if parts[2] != 'NA' else ''
-                        task['speed'] = parts[3].strip() if parts[3] != 'NA' else ''
-                        task['eta'] = parts[4].strip() if parts[4] != 'NA' else ''
-                        frag_cur = parts[5].strip()
-                        frag_total = parts[6].strip()
-                        if frag_cur and frag_cur != 'NA':
-                            try:
-                                task['frag_current'] = int(frag_cur)
-                            except ValueError:
-                                pass
-                        if frag_total and frag_total != 'NA':
-                            try:
-                                task['frag_total'] = int(frag_total)
-                            except ValueError:
-                                pass
+                        task["error"] = line.replace("ERROR:", "").replace("ffmpeg error", "").strip()
+                    last_error = task["error"]
 
-            # 检测错误
-            if line.startswith("ERROR:") or line.startswith("ffmpeg error"):
-                with tasks_lock:
-                    task["error"] = line.replace("ERROR:", "").replace("ffmpeg error", "").strip()
-                    task["status"] = "failed"
+                # 检测合并/完成状态
+                if '[Merger]' in line or '[ffmpeg]' in line:
+                    with tasks_lock:
+                        task['status'] = 'merging'
+                        task['percent'] = 100.0
 
-            # 检测合并/完成状态
-            if '[Merger]' in line or '[ffmpeg]' in line:
-                with tasks_lock:
-                    task['status'] = 'merging'
-                    task['percent'] = 100.0
-
-            # 检测最终文件名
-            m = re.search(r'\[(?:Merger|download)\].*?"([^"]+)"', line)
-            if m:
-                with tasks_lock:
-                    task['output_file'] = m.group(1)
-
-            # 检测已完成
-            if 'has already been downloaded' in line:
-                m = re.search(r'"([^"]+)"', line)
+                # 检测最终文件名
+                m = re.search(r'\[(?:Merger|download)\].*?"([^"]+)"', line)
                 if m:
                     with tasks_lock:
-                        task['status'] = 'completed'
-                        task['percent'] = 100.0
                         task['output_file'] = m.group(1)
 
-            # 检测 [download] Destination 行获取文件名
-            m2 = re.search(r'\[download\]\s+Destination:\s+(.+)', line)
-            if m2:
-                with tasks_lock:
-                    task['output_file'] = m2.group(1).strip()
-
-            now = time.time()
-            if now - last_update > 0.5:
-                last_update = now
-
-        process.wait()
-        ret = process.returncode
-
-        # 先释放锁, 再判断结果
-        if ret == 0:
-            with tasks_lock:
-                task['status'] = 'completed'
-                task['percent'] = 100.0
-                task['completed_at'] = time.time()
-
-                # 尝试找到输出文件
-                if 'output_file' not in task or not task['output_file']:
-                    files = sorted(DOWNLOAD_DIR.glob('*'), key=lambda f: f.stat().st_mtime, reverse=True)
-                    for f in files:
-                        if f.is_file() and f.suffix in ['.mp4', '.mkv', '.webm', '.mp3', '.m4a']:
-                            task['output_file'] = f.name
-                            break
-        else:
-            # yt-dlp 失败: 尝试智能提取真实视频地址后重试 (在锁外执行, 不阻塞API)
-            real_url = extract_real_video_url(url)
-            if real_url and real_url != '__JS_CHALLENGE__' and real_url != url:
-                with tasks_lock:
-                    task['status'] = 'downloading'
-                    task['percent'] = 0
-                    task['error'] = ''
-                    task['output_file'] = ''
-                # 用提取到的真实地址重新构建命令并运行
-                retry_cmd = [c for c in cmd if c != url]
-                retry_cmd.append(real_url)
-                try:
-                    process2 = subprocess.Popen(
-                        retry_cmd,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        cwd=str(DOWNLOAD_DIR),
-                    )
-                    with tasks_lock:
-                        task['pid'] = process2.pid
-                        task['process'] = process2
-                    for line2 in process2.stdout:
-                        line2 = line2.strip()
-                        if not line2:
-                            continue
-                        if line2.startswith('P|'):
-                            parts2 = line2.split('|')
-                            if len(parts2) >= 7:
-                                with tasks_lock:
-                                    pct_s = parts2[1].strip().replace('%', '')
-                                    try:
-                                        task['percent'] = float(pct_s)
-                                    except ValueError:
-                                        pass
-                                    task['total_size'] = parts2[2].strip() if parts2[2] != 'NA' else ''
-                                    task['speed'] = parts2[3].strip() if parts2[3] != 'NA' else ''
-                                    task['eta'] = parts2[4].strip() if parts2[4] != 'NA' else ''
-                        if '[Merger]' in line2 or '[ffmpeg]' in line2:
-                            with tasks_lock:
-                                task['status'] = 'merging'
-                                task['percent'] = 100.0
-                        m_fn = re.search(r'\[(?:Merger|download)\].*?"([^"]+)"', line2)
-                        if m_fn:
-                            with tasks_lock:
-                                task['output_file'] = m_fn.group(1)
-                        m_dest = re.search(r'\[download\]\s+Destination:\s+(.+)', line2)
-                        if m_dest:
-                            with tasks_lock:
-                                task['output_file'] = m_dest.group(1).strip()
-                    process2.wait()
-                    ret2 = process2.returncode
-                    with tasks_lock:
-                        if ret2 == 0:
+                # 检测已完成
+                if 'has already been downloaded' in line:
+                    m = re.search(r'"([^"]+)"', line)
+                    if m:
+                        with tasks_lock:
                             task['status'] = 'completed'
                             task['percent'] = 100.0
-                            task['completed_at'] = time.time()
-                            if not task.get('output_file'):
-                                files = sorted(DOWNLOAD_DIR.glob('*'), key=lambda f: f.stat().st_mtime, reverse=True)
-                                for f in files:
-                                    if f.is_file() and f.suffix in ['.mp4', '.mkv', '.webm', '.mp3', '.m4a']:
-                                        task['output_file'] = f.name
-                                        break
-                        else:
-                            task['status'] = 'failed'
-                            task['error'] = f'智能提取后下载仍失败 (退出码 {ret2})'
-                except Exception as e2:
-                    with tasks_lock:
-                        task['status'] = 'failed'
-                        task['error'] = f'重试失败: {str(e2)}'
-            elif real_url == '__JS_CHALLENGE__':
-                with tasks_lock:
-                    task['status'] = 'failed'
-                    task['error'] = '该网站需要 JS 安全验证, yt-dlp 无法直接下载 (如论坛等)'
-            else:
-                with tasks_lock:
-                    task['status'] = 'failed'
-                    task['error'] = f'yt-dlp 退出码 {ret}'
+                            task['output_file'] = m.group(1)
 
-    except FileNotFoundError:
-        with tasks_lock:
-            task['status'] = 'failed'
-            task['error'] = 'yt-dlp 未安装'
-    except Exception as e:
-        with tasks_lock:
-            task['status'] = 'failed'
-            task['error'] = str(e)
+                # 检测 [download] Destination 行获取文件名
+                m2 = re.search(r'\[download\]\s+Destination:\s+(.+)', line)
+                if m2:
+                    with tasks_lock:
+                        task['output_file'] = m2.group(1).strip()
+
+                now = time.time()
+                if now - last_update > 0.5:
+                    last_update = now
+
+            process.wait()
+            ret = process.returncode
+
+            if ret == 0:
+                with tasks_lock:
+                    task['status'] = 'completed'
+                    task['percent'] = 100.0
+                    task['completed_at'] = time.time()
+
+                    # 尝试找到输出文件
+                    if 'output_file' not in task or not task['output_file']:
+                        files = sorted(DOWNLOAD_DIR.glob('*'), key=lambda f: f.stat().st_mtime, reverse=True)
+                        for f in files:
+                            if f.is_file() and f.suffix in ['.mp4', '.mkv', '.webm', '.mp3', '.m4a']:
+                                task['output_file'] = f.name
+                                break
+                download_success = True
+                break  # 下载成功, 退出重试循环
+            else:
+                # TikTok 失败时自动重试; 非 TikTok 走下面的 fallback
+                if is_tiktok and attempt < max_attempts:
+                    continue
+                last_error = last_error or f'yt-dlp 退出码 {ret}'
+                break
+
+        except FileNotFoundError:
+            with tasks_lock:
+                task['status'] = 'failed'
+                task['error'] = 'yt-dlp 未安装'
+            return
+        except Exception as e:
+            last_error = str(e)
+            if is_tiktok and attempt < max_attempts:
+                continue
+            break
+
+    # 所有重试都失败后, 尝试智能提取真实视频地址 (非 TikTok 的 fallback)
+    if not download_success:
+        real_url = extract_real_video_url(url)
+        if real_url and real_url != '__JS_CHALLENGE__' and real_url != url:
+            with tasks_lock:
+                task['status'] = 'downloading'
+                task['percent'] = 0
+                task['error'] = ''
+                task['output_file'] = ''
+            # 用提取到的真实地址重新构建命令并运行
+            retry_cmd = [c for c in cmd if c != url]
+            retry_cmd.append(real_url)
+            try:
+                process2 = subprocess.Popen(
+                    retry_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    cwd=str(DOWNLOAD_DIR),
+                )
+                with tasks_lock:
+                    task['pid'] = process2.pid
+                    task['process'] = process2
+                for line2 in process2.stdout:
+                    line2 = line2.strip()
+                    if not line2:
+                        continue
+                    if line2.startswith('P|'):
+                        parts2 = line2.split('|')
+                        if len(parts2) >= 7:
+                            with tasks_lock:
+                                pct_s = parts2[1].strip().replace('%', '')
+                                try:
+                                    task['percent'] = float(pct_s)
+                                except ValueError:
+                                    pass
+                                task['total_size'] = parts2[2].strip() if parts2[2] != 'NA' else ''
+                                task['speed'] = parts2[3].strip() if parts2[3] != 'NA' else ''
+                                task['eta'] = parts2[4].strip() if parts2[4] != 'NA' else ''
+                    if '[Merger]' in line2 or '[ffmpeg]' in line2:
+                        with tasks_lock:
+                            task['status'] = 'merging'
+                            task['percent'] = 100.0
+                    m_fn = re.search(r'\[(?:Merger|download)\].*?"([^"]+)"', line2)
+                    if m_fn:
+                        with tasks_lock:
+                            task['output_file'] = m_fn.group(1)
+                    m_dest = re.search(r'\[download\]\s+Destination:\s+(.+)', line2)
+                    if m_dest:
+                        with tasks_lock:
+                            task['output_file'] = m_dest.group(1).strip()
+                process2.wait()
+                ret2 = process2.returncode
+                with tasks_lock:
+                    if ret2 == 0:
+                        task['status'] = 'completed'
+                        task['percent'] = 100.0
+                        task['completed_at'] = time.time()
+                        if not task.get('output_file'):
+                            files = sorted(DOWNLOAD_DIR.glob('*'), key=lambda f: f.stat().st_mtime, reverse=True)
+                            for f in files:
+                                if f.is_file() and f.suffix in ['.mp4', '.mkv', '.webm', '.mp3', '.m4a']:
+                                    task['output_file'] = f.name
+                                    break
+                    else:
+                        task['status'] = 'failed'
+                        task['error'] = f'智能提取后下载仍失败 (退出码 {ret2})'
+            except Exception as e2:
+                with tasks_lock:
+                    task['status'] = 'failed'
+                    task['error'] = f'重试失败: {str(e2)}'
+        elif real_url == '__JS_CHALLENGE__':
+            with tasks_lock:
+                task['status'] = 'failed'
+                task['error'] = '该网站需要 JS 安全验证, yt-dlp 无法直接下载 (如论坛等)'
+        else:
+            with tasks_lock:
+                task['status'] = 'failed'
+                task['error'] = last_error or '下载失败'
 
 
 @app.route('/')
@@ -877,9 +920,12 @@ def stream_download():
     fmt = data.get('format', 'best')
     cmd = [
         'yt-dlp',
+        '--no-check-certificates',
         '--extractor-args', 'generic:impersonate',
         '--concurrent-fragments', str(int(data.get('concurrent', 10))),
         '--throttled-rate', '100K',
+        '--retries', '10',
+        '--fragment-retries', '10',
         '-o', '-',
         '--no-part',
     ]
@@ -902,7 +948,7 @@ def stream_download():
     content_length = None
     try:
         info_proc = subprocess.run(
-            ['yt-dlp', '--extractor-args', 'generic:impersonate', '-J', url],
+            ['yt-dlp', '--no-check-certificates', '--extractor-args', 'generic:impersonate', '-J', url],
             capture_output=True, text=True, timeout=60, cwd=str(DOWNLOAD_DIR)
         )
         if info_proc.stdout:
