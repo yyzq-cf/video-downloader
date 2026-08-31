@@ -518,6 +518,77 @@
         .choice-btn .choice-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem; }
         .choice-btn .choice-desc { font-size: 0.78rem; color: var(--text-secondary); }
 
+        /* Supported Sites */
+        .sites-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-top: 2rem;
+            box-shadow: var(--shadow);
+        }
+        .sites-card h3 {
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .sites-card h3 .sites-toggle {
+            margin-left: auto;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.2rem 0.6rem;
+            transition: all 0.2s;
+        }
+        .sites-card h3 .sites-toggle:hover { color: var(--accent); border-color: var(--accent); }
+        .sites-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.6rem;
+        }
+        .sites-grid.collapsed { display: none; }
+        .site-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            background: var(--bg-input);
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            transition: all 0.15s;
+        }
+        .site-item:hover { color: var(--text-primary); transform: translateY(-1px); }
+        .site-item .site-icon { font-size: 1.1rem; flex-shrink: 0; }
+        .site-item .site-name { font-weight: 500; }
+        .site-item .site-badge {
+            margin-left: auto;
+            font-size: 0.68rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            background: rgba(46,204,113,0.15);
+            color: var(--success);
+            font-weight: 600;
+        }
+        .site-item .site-badge.retry {
+            background: rgba(243,156,18,0.15);
+            color: var(--warning);
+        }
+        .sites-note {
+            margin-top: 1rem;
+            padding-top: 0.8rem;
+            border-top: 1px dashed var(--border);
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
         /* Card shadows via theme variable */
         .download-card, .task-item, .file-item, .account-modal, .modal-content, .toast { box-shadow: var(--shadow); }
 
@@ -625,6 +696,39 @@
 
         <div id="taskListPanel" class="task-list"></div>
         <div id="fileListPanel" class="file-list" style="display:none;"></div>
+
+        <!-- Supported Sites -->
+        <div class="sites-card">
+            <h3>
+                ✅ 实测支持网站
+                <span class="sites-toggle" onclick="toggleSites()">收起 ▴</span>
+            </h3>
+            <div class="sites-grid" id="sitesGrid">
+                <div class="site-item"><span class="site-icon">▶</span><span class="site-name">YouTube</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">🎵</span><span class="site-name">TikTok</span><span class="site-badge retry">自动重试</span></div>
+                <div class="site-item"><span class="site-icon">📺</span><span class="site-name">Bilibili (B站)</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">🎥</span><span class="site-name">Twitter / X</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">📸</span><span class="site-name">Instagram</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">🎞</span><span class="site-name">Vimeo</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">🎵</span><span class="site-name">SoundCloud</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">📺</span><span class="site-name">Dailymotion</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">🎥</span><span class="site-name">Reddit</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">📺</span><span class="site-name">Twitch</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">🎬</span><span class="site-name">Facebook</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">📺</span><span class="site-name">Pexels</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">🎵</span><span class="site-name">Bandcamp</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">📺</span><span class="site-name">Pinterest</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">🎬</span><span class="site-name">Streamable</span><span class="site-badge">实测</span></div>
+                <div class="site-item"><span class="site-icon">🌐</span><span class="site-name">Cloudflare 站点</span><span class="site-badge">绕过</span></div>
+                <div class="site-item"><span class="site-icon">🎬</span><span class="site-name">MacCMS 站点</span><span class="site-badge">智能提取</span></div>
+                <div class="site-item"><span class="site-icon">📋</span><span class="site-name">m3u8 / mp4 直链</span><span class="site-badge">实测</span></div>
+            </div>
+            <div class="sites-note">
+                📌 基于 yt-dlp 引擎，理论上支持 1700+ 网站。上方为实测确认可用的站点，持续更新中。<br>
+                🔄 TikTok 因 WAF 反爬不稳定，已内置自动重试机制 (最多 5 次)，偶尔需要多次尝试。<br>
+                🚫 需要登录才能查看的页面、付费墙内容、以及强 JS 验证的论坛网站暂不支持。
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1120,6 +1224,19 @@ async function clearTasks() {
         }
     } catch(e) {
         showToast('请求失败: ' + e.message, 'error');
+    }
+}
+
+// === Sites Toggle ===
+function toggleSites() {
+    const grid = document.getElementById('sitesGrid');
+    const btn = document.querySelector('.sites-toggle');
+    if (grid.classList.contains('collapsed')) {
+        grid.classList.remove('collapsed');
+        btn.textContent = '收起 ▴';
+    } else {
+        grid.classList.add('collapsed');
+        btn.textContent = '展开 ▾';
     }
 }
 
