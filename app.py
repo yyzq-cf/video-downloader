@@ -216,8 +216,8 @@ def parse_ytdlp_progress(line):
         result['status'] = 'merging'
         return result
 
-    # [Merger] Merging formats into ...
-    if '[Merger]' in line or '[ffmpeg]' in line:
+    # [Merger] Merging formats into ... / [ExtractAudio] Converting ...
+    if '[Merger]' in line or '[ffmpeg]' in line or '[ExtractAudio]' in line:
         result['status'] = 'merging'
         result['percent'] = 100.0
         return result
@@ -409,6 +409,14 @@ def run_download(task_id, url, options):
                         task['status'] = 'merging'
                         task['percent'] = 100.0
 
+                # 检测 [ExtractAudio] 目标文件名 (音频提取: .webm -> .mp3, 原 .webm 会被删除)
+                m_ea = re.search(r'\[ExtractAudio\]\s+Destination:\s+(.+)', line)
+                if m_ea:
+                    with tasks_lock:
+                        task['output_file'] = m_ea.group(1).strip()
+                        task['status'] = 'merging'
+                        task['percent'] = 100.0
+
                 # 检测最终文件名
                 m = re.search(r'\[(?:Merger|download)\].*?"([^"]+)"', line)
                 if m:
@@ -444,7 +452,9 @@ def run_download(task_id, url, options):
                     task['completed_at'] = time.time()
 
                     # 尝试找到输出文件
-                    if 'output_file' not in task or not task['output_file']:
+                    # 如果 output_file 指向的文件不存在 (如 .webm 被音频提取后删除), 重新扫描
+                    output_path = DOWNLOAD_DIR / task['output_file'] if task.get('output_file') else None
+                    if not task.get('output_file') or (output_path and not output_path.exists()):
                         files = sorted(DOWNLOAD_DIR.glob('*'), key=lambda f: f.stat().st_mtime, reverse=True)
                         for f in files:
                             if f.is_file() and f.suffix in ['.mp4', '.mkv', '.webm', '.mp3', '.m4a']:
@@ -513,6 +523,10 @@ def run_download(task_id, url, options):
                         with tasks_lock:
                             task['status'] = 'merging'
                             task['percent'] = 100.0
+                    m_ea2 = re.search(r'\[ExtractAudio\]\s+Destination:\s+(.+)', line2)
+                    if m_ea2:
+                        with tasks_lock:
+                            task['output_file'] = m_ea2.group(1).strip()
                     m_fn = re.search(r'\[(?:Merger|download)\].*?"([^"]+)"', line2)
                     if m_fn:
                         with tasks_lock:
