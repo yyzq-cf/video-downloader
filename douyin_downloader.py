@@ -20,7 +20,17 @@ DOUYIN_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' \
 
 def is_douyin_url(url):
     """判断是否为抖音视频链接"""
-    return 'douyin.com' in url and ('/video/' in url or '/note/' in url)
+    if 'douyin.com' not in url:
+        return False
+    # /video/  /note/  或含 modal_id 参数(搜索页/用户页弹窗播放)
+    if '/video/' in url or '/note/' in url:
+        return True
+    if 'modal_id=' in url:
+        return True
+    # 短链接
+    if 'v.douyin.com' in url:
+        return True
+    return False
 
 
 def extract_aweme_id(url):
@@ -31,6 +41,11 @@ def extract_aweme_id(url):
         return m.group(1)
     # https://www.iesdouyin.com/share/video/7574659948187279013/
     m = re.search(r'iesdouyin\.com/share/video/(\d+)', url)
+    if m:
+        return m.group(1)
+    # modal_id 参数: 搜索页/用户页等弹窗播放视频
+    # https://www.douyin.com/user/self/search/xxx?modal_id=7610785845473528165
+    m = re.search(r'modal_id=(\d+)', url)
     if m:
         return m.group(1)
     # 纯数字
