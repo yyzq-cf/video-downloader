@@ -10,6 +10,7 @@
 - ⚡ **多线程并发** — 支持 5-20 线程同时下载分片，速度拉满
 - 🎵 **分离流自动合并** — 智能选择 `bestvideo+bestaudio` 方案，支持 m3u8/HLS 等只有分离流的源
 - 🎬 **画质选择** — 最高画质 / 1080p / 720p / 仅音频(MP3)
+- 🎵 **抖音无水印下载** — 专用 API 获取无水印视频，不走 yt-dlp，无需登录
 
 ### 下载模式
 - 🖥️ **存服务器模式** — 视频下载到服务器硬盘，可在线播放、手动保存
@@ -74,7 +75,8 @@ python app.py
 | **Flask** | Web 后端框架 |
 | **gunicorn** | 生产级 WSGI 服务器（单 worker 多线程） |
 | **yt-dlp** | 视频下载核心引擎 |
-| **curl_cffi** | Cloudflare 指纹绕过 |
+| **curl_cffi** | Cloudflare 指纹绕过 / 抖音API请求 |
+| **douyin_downloader** | 抖音无水印视频下载模块 |
 | **ffmpeg** | 视频合并/转码 |
 | **原生 JS** | 前端，无框架依赖 |
 
@@ -92,6 +94,7 @@ python app.py
 ```
 video-downloader/
 ├── app.py                 # Flask 后端
+├── douyin_downloader.py   # 抖音无水印下载模块
 ├── templates/
 │   └── index.html         # Web UI（明暗主题）
 ├── downloads/             # 下载文件目录
@@ -105,6 +108,7 @@ video-downloader/
 
 ## 📋 更新日志
 
+- **抖音无水印下载** — 专用 API 获取无水印视频，自动检测抖音链接，预览视频信息
 - **主题切换** — 默认亮色主题，支持暗色切换，`localStorage` 记住选择
 - **流式直传** — 新增直传本地模式，yt-dlp 边下边传，服务器零磁盘占用
 - **自动下载** — 存服务器模式完成后自动触发浏览器下载
