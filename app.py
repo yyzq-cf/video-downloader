@@ -248,6 +248,31 @@ def extract_real_video_url(url):
             return None
         html = r.text
 
+        # 0. 先找 iframe player (如 /Player/V2?payload=xxx), 请求它获取带token的m3u8
+        iframe_matches = re.findall(r'src=["\']([^"\']*/Player/[^"\']+)', html, re.I)
+        if iframe_matches:
+            from urllib.parse import urljoin
+            for iframe_src in iframe_matches:
+                iframe_url = urljoin(url, iframe_src)
+                try:
+                    r2 = cffi_requests.get(iframe_url, impersonate='chrome', timeout=20,
+                                           headers={'Referer': url})
+                    if r2.status_code == 200:
+                        # 在iframe页面里找带token的m3u8 (优先返回有token的)
+                        token_m3u8 = re.findall(r'["\']([^"\' ]*m3u8[^"\' ]*token=[^"\' ]*)["\']', r2.text)
+                        if token_m3u8:
+                            u = token_m3u8[0].replace(chr(92)+chr(47), '/')
+                            if u.startswith('http'):
+                                return u
+                        # 有token的没找到, 找普通的m3u8
+                        iframe_m3u8 = re.findall(r'["\']([^"\' ]*m3u8[^"\' ]*)["\']', r2.text)
+                        for u in iframe_m3u8:
+                            u = u.replace(chr(92)+chr(47), '/')
+                            if u.startswith('http'):
+                                return u
+                except Exception:
+                    pass
+
         # 1. MacCMS player_aaaa 变量中的 m3u8/url
         m = re.search(r'player_aaaa\s*=\s*(\{[^}]+\})', html)
         if m:
@@ -260,8 +285,14 @@ def extract_real_video_url(url):
             except Exception:
                 pass
 
-        # 2. 直接搜索 m3u8 链接
-        m3u8_matches = re.findall(r'[\'\"\']([^\'\"\' ]*m3u8[^\'\"\' ]*)[\'\"\']', html)
+        # 2. 直接搜索 m3u8 链接 (优先找带token参数的)
+        m3u8_matches = re.findall(r'["\']([^"\' ]*m3u8[^"\' ]*token=[^"\' ]*)["\']', html)
+        for u in m3u8_matches:
+            u = u.replace(chr(92)+chr(47), '/')
+            if u.startswith('http'):
+                return u
+        # 再找普通m3u8
+        m3u8_matches = re.findall(r'["\']([^"\' ]*m3u8[^"\' ]*)["\']', html)
         for u in m3u8_matches:
             u = u.replace(chr(92)+chr(47), '/')
             if u.startswith('http'):
