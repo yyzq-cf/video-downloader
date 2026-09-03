@@ -931,7 +931,7 @@ async function checkDouyinInfo(url) {
         const data = await resp.json();
         if (data.ok) {
             const duration = data.duration > 60 ? Math.floor(data.duration/60)+'分'+Math.floor(data.duration%60)+'秒' : data.duration.toFixed(1)+'秒';
-            const msg = \`🎬 \${data.author} | ⏱ \${duration} | 📐 \${data.width}x\${data.height} | 📦 \${data.size_str}\`;
+            const msg = `🎬 ${data.author} | ⏱ ${duration} | 📐 ${data.width}x${data.height} | 📦 ${data.size_str}`;
             showToast(msg, 'success');
         } else if (data.error) {
             showToast('抖音视频: ' + data.error, 'error');
