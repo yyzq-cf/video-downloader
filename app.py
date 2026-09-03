@@ -19,6 +19,8 @@ from functools import wraps
 from flask import Flask, request, jsonify, send_file, render_template, session
 from pathlib import Path
 
+import douyin_downloader
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.permanent_session_lifetime = 7 * 24 * 3600  # 7 days
@@ -291,6 +293,11 @@ def is_tiktok_url(url):
     return 'tiktok.com' in url or 'douyin.com' in url
 
 
+def is_douyin_url(url):
+    """判断是否为抖音视频链接"""
+    return douyin_downloader.is_douyin_url(url)
+
+
 def build_ytdlp_cmd(url, options, output_template=None):
     """构建 yt-dlp 命令行"""
     if output_template is None:
@@ -329,9 +336,116 @@ def build_ytdlp_cmd(url, options, output_template=None):
     return cmd
 
 
+def run_douyin_download(task_id, url, options):
+    """抖音专用下载: 通过 API 获取无水印视频地址, 直接下载"""
+    task = tasks[task_id]
+    with tasks_lock:
+        task['status'] = 'downloading'
+        task['percent'] = 0
+        task['error'] = ''
+        task['started_at'] = time.time()
+
+    # 解析短链接 (v.douyin.com)
+    resolved_url = douyin_downloader.resolve_short_url(url)
+
+    # 提取视频ID
+    aweme_id = douyin_downloader.extract_aweme_id(resolved_url)
+    if not aweme_id:
+        with tasks_lock:
+            task['status'] = 'failed'
+            task['error'] = '无法提取抖音视频ID, 请检查链接'
+        return
+
+    # 获取视频信息
+    info = douyin_downloader.get_video_info(aweme_id)
+    if not info['ok']:
+        with tasks_lock:
+            task['status'] = 'failed'
+            task['error'] = info.get('error', '获取视频信息失败')
+        return
+
+    # 构建文件名
+    title = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', info['title']).strip()[:150]
+    filename = f"{title}.mp4"
+    output_path = DOWNLOAD_DIR / filename
+
+    with tasks_lock:
+        task['output_file'] = filename
+        task['total_size'] = f"{info['size']/1024/1024:.1f}MB" if info['size'] else ''
+
+    # 下载视频 (带进度跟踪)
+    try:
+        from curl_cffi import requests
+        r = requests.get(
+            info['download_url'],
+            headers={
+                'User-Agent': douyin_downloader.DOUYIN_UA,
+                'Referer': 'https://www.douyin.com/',
+                'Cookie': douyin_downloader.DOUYIN_COOKIE,
+            },
+            impersonate='chrome',
+            timeout=300,
+            stream=True,
+        )
+
+        if r.status_code != 200:
+            with tasks_lock:
+                task['status'] = 'failed'
+                task['error'] = f'下载失败: HTTP {r.status_code}'
+            return
+
+        total = int(r.headers.get('content-length', info['size'] or 0))
+        downloaded = 0
+        last_update = 0
+
+        with open(output_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=1024 * 256):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+
+                    now = time.time()
+                    if now - last_update > 0.5 and total > 0:
+                        last_update = now
+                        pct = min(downloaded * 100 / total, 99.9)
+                        speed = downloaded / (now - task['started_at']) if now > task['started_at'] else 0
+                        with tasks_lock:
+                            task['percent'] = round(pct, 1)
+                            task['speed'] = f"{speed/1024/1024:.1f}MB/s" if speed > 1024*1024 else f"{speed/1024:.0f}KB/s"
+                            eta_sec = (total - downloaded) / speed if speed > 0 else 0
+                            m, s = divmod(int(eta_sec), 60)
+                            task['eta'] = f"{m:02d}:{s:02d}"
+
+        if downloaded == 0:
+            with tasks_lock:
+                task['status'] = 'failed'
+                task['error'] = '下载文件为空'
+            if output_path.exists():
+                output_path.unlink()
+            return
+
+        with tasks_lock:
+            task['status'] = 'completed'
+            task['percent'] = 100.0
+            task['completed_at'] = time.time()
+            task['output_file'] = filename
+
+    except Exception as e:
+        with tasks_lock:
+            task['status'] = 'failed'
+            task['error'] = f'下载异常: {str(e)}'
+        if output_path.exists():
+            output_path.unlink()
+
+
 def run_download(task_id, url, options):
     """在后台线程中运行 yt-dlp, 支持 TikTok 重试"""
     task = tasks[task_id]
+
+    # ─── 抖音视频: 使用专用下载器 (不走 yt-dlp) ───
+    if is_douyin_url(url):
+        run_douyin_download(task_id, url, options)
+        return
 
     # TikTok 链接需要重试机制: TikTok WAF 不稳定, 有时返回不完整页面
     is_tiktok = is_tiktok_url(url)
@@ -645,6 +759,38 @@ def change_un():
         session['username'] = new_username
         return jsonify({'status': 'ok', 'username': new_username})
     return jsonify({'error': '密码错误或用户名已存在'}), 400
+
+
+@app.route('/api/douyin/info', methods=['POST'])
+@login_required
+def douyin_info():
+    """预览抖音视频信息"""
+    data = request.json or {}
+    url = data.get('url', '').strip()
+    if not url:
+        return jsonify({'error': '请输入URL'}), 400
+
+    # 解析短链接
+    resolved = douyin_downloader.resolve_short_url(url)
+    aweme_id = douyin_downloader.extract_aweme_id(resolved)
+    if not aweme_id:
+        return jsonify({'error': '无法识别抖音视频链接'}), 400
+
+    info = douyin_downloader.get_video_info(aweme_id)
+    if not info['ok']:
+        return jsonify({'error': info.get('error', '获取失败')}), 400
+
+    return jsonify({
+        'ok': True,
+        'title': info['title'],
+        'author': info['author'],
+        'duration': round(info['duration'], 1),
+        'width': info['width'],
+        'height': info['height'],
+        'size': info['size'],
+        'size_str': f"{info['size']/1024/1024:.1f}MB" if info['size'] else '-',
+        'cover': info['cover'],
+    })
 
 
 @app.route('/api/download', methods=['POST'])
