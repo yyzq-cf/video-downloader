@@ -5,6 +5,7 @@ ywsj Video Downloader - Web UI for yt-dlp
 """
 
 import os
+import logging
 import re
 import json
 import uuid
@@ -339,6 +340,7 @@ def build_ytdlp_cmd(url, options, output_template=None):
         '--no-check-certificates',
         '--extractor-args', 'generic:impersonate',
         '--newline',
+        '--enable-file-urls',
         '--progress',
         '--continue',
         '--retries', '10',
@@ -486,6 +488,110 @@ def run_download(task_id, url, options):
     task['status'] = 'downloading'
     task['started_at'] = time.time()
 
+    # ─── 提前提取真实视频地址 (对于有iframe player的网站可避免第一次yt-dlp失败) ───
+    pre_extracted_url = None
+    if not is_tiktok:
+        pre_extracted_url = extract_real_video_url(url)
+        if pre_extracted_url == '__JS_CHALLENGE__':
+            pre_extracted_url = None
+        elif pre_extracted_url and pre_extracted_url != url:
+            # 成功提取到真实地址
+            from urllib.parse import urlparse, urlencode, quote
+            origin = urlparse(url)
+            referer = f"{origin.scheme}://{origin.netloc}/"
+
+            # 如果是带token的m3u8, 需要特殊处理: CDN要求每个子请求都带token
+            # 方案: 用 curl_cffi 下载m3u8, 把子playlist/ts路径改写为带token的完整URL,
+            # 生成本地proxy m3u8 让 yt-dlp 下载
+            if '.m3u8' in pre_extracted_url and 'token=' in pre_extracted_url:
+                try:
+                    from curl_cffi import requests as cffi_req
+                    import tempfile
+
+                    # 解析token参数
+                    parsed = urlparse(pre_extracted_url)
+                    token_qs = parsed.query  # token=xxx&expires=xxx&token_path=xxx
+                    base_path = parsed.path.rsplit('/', 1)[0]  # .../6e0e2c3c-xxx
+                    base_url = f"{parsed.scheme}://{parsed.netloc}{base_path}"
+
+                    r = cffi_req.get(pre_extracted_url, impersonate='chrome', timeout=15,
+                                     headers={'Referer': referer})
+                    if r.status_code == 200:
+                        master_content = r.text
+
+                        # 处理master playlist: 把子playlist路径改成带token的完整URL
+                        proxy_lines = []
+                        for line in master_content.split('\n'):
+                            line = line.strip()
+                            if line and not line.startswith('#'):
+                                # 这是子playlist路径, 如 720p/video.m3u8
+                                sub_url = f"{base_url}/{line}?{token_qs}"
+                                # 下载子playlist, 把ts路径也改成带token的
+                                r_sub = cffi_req.get(sub_url, impersonate='chrome', timeout=15,
+                                                     headers={'Referer': referer})
+                                if r_sub.status_code == 200:
+                                    sub_base = sub_url.rsplit('/', 1)[0]
+                                    sub_lines = []
+                                    for sline in r_sub.text.split('\n'):
+                                        sline = sline.strip()
+                                        if sline and not sline.startswith('#'):
+                                            # ts路径, 改成带token的完整URL
+                                            ts_url = f"{sub_base}/{sline}?{token_qs}"
+                                            sub_lines.append(ts_url)
+                                        else:
+                                            sub_lines.append(sline)
+                                    # 写入临时文件
+                                    sub_proxy = tempfile.NamedTemporaryFile(
+                                        mode='w', suffix='.m3u8', dir=str(DOWNLOAD_DIR),
+                                        delete=False)
+                                    sub_proxy.write('\n'.join(sub_lines))
+                                    sub_proxy.close()
+                                    proxy_lines.append(sub_proxy.name)
+                                else:
+                                    logging.warning(f"子playlist下载失败: {r_sub.status_code}")
+                            else:
+                                pass
+
+                        if proxy_lines:
+                            # 只取第一个(最高画质)的子playlist
+                            pre_extracted_url = proxy_lines[0]
+                            cmd = [c for c in cmd if c != url]
+                            cmd = [c for c in cmd if c != "--extractor-args" and c != "generic:impersonate"]
+                            cmd.append("file://" + pre_extracted_url)
+                            logging.info(f"创建proxy m3u8: {pre_extracted_url}")
+                        else:
+                            # master playlist本身就是最低层(直接含ts)
+                            proxy_lines = []
+                            for line in master_content.split('\n'):
+                                line = line.strip()
+                                if line and not line.startswith('#'):
+                                    ts_url = f"{base_url}/{line}?{token_qs}"
+                                    proxy_lines.append(ts_url)
+                                else:
+                                    proxy_lines.append(line)
+                            proxy_file = tempfile.NamedTemporaryFile(
+                                mode='w', suffix='.m3u8', dir=str(DOWNLOAD_DIR), delete=False)
+                            proxy_file.write('\n'.join(proxy_lines))
+                            proxy_file.close()
+                            pre_extracted_url = proxy_file.name
+                            cmd = [c for c in cmd if c != url]
+                            cmd = [c for c in cmd if c != "--extractor-args" and c != "generic:impersonate"]
+                            cmd.append("file://" + pre_extracted_url)
+                            logging.info(f"创建proxy m3u8(单层): {pre_extracted_url}")
+                    else:
+                        raise Exception(f"m3u8下载失败: {r.status_code}")
+                except Exception as e:
+                    logging.warning(f"proxy m3u8创建失败: {e}, 回退到直接URL")
+                    cmd = [c for c in cmd if c != url]
+                    cmd.extend(['--add-header', f'Referer: {referer}'])
+                    cmd.append(pre_extracted_url)
+            else:
+                # 普通m3u8或mp4, 直接用 + Referer
+                cmd = [c for c in cmd if c != url]
+                cmd.extend(['--add-header', f'Referer: {referer}'])
+                cmd.append(pre_extracted_url)
+            logging.info(f"预提取视频地址: {pre_extracted_url[:80]}...")
+
     download_success = False
     last_error = ''
 
@@ -626,7 +732,7 @@ def run_download(task_id, url, options):
             break
 
     # 所有重试都失败后, 尝试智能提取真实视频地址 (非 TikTok 的 fallback)
-    if not download_success:
+    if not download_success and not pre_extracted_url:
         real_url = extract_real_video_url(url)
         if real_url and real_url != '__JS_CHALLENGE__' and real_url != url:
             with tasks_lock:
@@ -636,6 +742,11 @@ def run_download(task_id, url, options):
                 task['output_file'] = ''
             # 用提取到的真实地址重新构建命令并运行
             retry_cmd = [c for c in cmd if c != url]
+            # 加上原始页面的Referer (CDN通常需要验证来源)
+            from urllib.parse import urlparse
+            origin = urlparse(url)
+            referer = f"{origin.scheme}://{origin.netloc}/"
+            retry_cmd.extend(['--add-header', f'Referer: {referer}'])
             retry_cmd.append(real_url)
             try:
                 process2 = subprocess.Popen(
