@@ -1310,15 +1310,17 @@ def clear_cache():
     deleted_files = []
     freed_bytes = 0
 
-    # 删除临时文件 (.part, .part-Frag*, .ytdl, --Frag*)
+    # 删除临时文件 (.part, .part-Frag*, .ytdl, --Frag*, .m3u8临时文件)
     for f in DOWNLOAD_DIR.iterdir():
         if f.is_file() and (
             f.name.endswith('.part') or
             f.name.endswith('.ytdl') or
+            f.name.endswith('.m3u8') or
             '.part-Frag' in f.name or
             '--Frag' in f.name or
             f.name.startswith('--Frag') or
-            re.search(r'-Frag\d+$', f.name)
+            re.search(r'-Frag\d+$', f.name) or
+            f.name.startswith('tmp') and f.suffix in ('.m3u8', '.mp4', '.ts')
         ):
             size = f.stat().st_size
             freed_bytes += size
