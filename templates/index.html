@@ -491,33 +491,6 @@
         .btn-logout:hover { background: rgba(231,76,60,0.1); }
 
         /* Download choice modal */
-        .choice-modal {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 2rem;
-            width: 100%;
-            max-width: 440px;
-            box-shadow: var(--shadow-strong);
-        }
-        .choice-modal h2 { font-size: 1.1rem; margin-bottom: 0.5rem; text-align: center; }
-        .choice-modal .choice-subtitle { font-size: 0.82rem; color: var(--text-secondary); text-align: center; margin-bottom: 1.5rem; }
-        .choice-options { display: flex; flex-direction: column; gap: 0.75rem; }
-        .choice-btn {
-            display: flex; align-items: center; gap: 1rem;
-            background: var(--bg-input);
-            border: 2px solid var(--border);
-            border-radius: 10px;
-            padding: 1rem 1.25rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: left;
-        }
-        .choice-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
-        .choice-btn .choice-icon { font-size: 1.8rem; flex-shrink: 0; }
-        .choice-btn .choice-text { flex: 1; }
-        .choice-btn .choice-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem; }
-        .choice-btn .choice-desc { font-size: 0.78rem; color: var(--text-secondary); }
 
         /* Supported Sites */
         .sites-card {
@@ -736,33 +709,6 @@
     </div>
 </div>
 
-<!-- Download Choice Modal -->
-<div class="modal" id="choiceModal" onclick="closeChoiceModal(event)">
-    <div class="choice-modal">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-            <h2>选择下载方式</h2>
-            <button class="modal-close" style="position:static;" onclick="closeChoiceModal()">&times;</button>
-        </div>
-        <p class="choice-subtitle">请选择视频下载到哪里</p>
-        <div class="choice-options">
-            <div class="choice-btn" onclick="confirmDownload('server')">
-                <span class="choice-icon">🖥</span>
-                <div class="choice-text">
-                    <div class="choice-title">存到服务器</div>
-                    <div class="choice-desc">下载到服务器硬盘，支持在线播放，完成后自动传输到本地</div>
-                </div>
-            </div>
-            <div class="choice-btn" onclick="confirmDownload('stream')">
-                <span class="choice-icon">📥</span>
-                <div class="choice-text">
-                    <div class="choice-title">直传到本地</div>
-                    <div class="choice-desc">视频流式传输直接到浏览器，服务器不存文件，零磁盘占用</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Video Player Modal -->
 <div class="modal" id="playerModal" onclick="closePlayer(event)">
     <div class="modal-content">
@@ -943,81 +889,36 @@ async function checkDouyinInfo(url) {
     }
 }
 
-function startDownload() {
+async function startDownload() {
     const url = document.getElementById('urlInput').value.trim();
     if (!url) { showToast('请输入 URL', 'error'); return; }
-    // 抖音链接: 先预览视频信息, 然后直接下载(不走stream模式)
+    // 抖音链接: 先预览视频信息
     if (isDouyinUrl(url)) {
         checkDouyinInfo(url);
     }
-    document.getElementById('choiceModal').classList.add('active');
-}
-
-function closeChoiceModal(e) {
-    if (e && e.target !== e.currentTarget) return;
-    document.getElementById('choiceModal').classList.remove('active');
-}
-
-async function confirmDownload(mode) {
-    const url = document.getElementById('urlInput').value.trim();
+    // 默认下载到服务器
     const format = document.getElementById('formatSelect').value;
     const concurrent = document.getElementById('concurrentSelect').value;
-    closeChoiceModal();
-
-    if (mode === 'stream') {
-        // Use hidden form POST -> browser native download with progress bar
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/api/stream-download';
-        form.style.display = 'none';
-        const inputUrl = document.createElement('input');
-        inputUrl.type = 'hidden';
-        inputUrl.name = 'url';
-        inputUrl.value = url;
-        const inputFormat = document.createElement('input');
-        inputFormat.type = 'hidden';
-        inputFormat.name = 'format';
-        inputFormat.value = format;
-        const inputConcurrent = document.createElement('input');
-        inputConcurrent.type = 'hidden';
-        inputConcurrent.name = 'concurrent';
-        inputConcurrent.value = concurrent;
-        form.appendChild(inputUrl);
-        form.appendChild(inputFormat);
-        form.appendChild(inputConcurrent);
-        // Add session cookie auth field
-        const inputAuth = document.createElement('input');
-        inputAuth.type = 'hidden';
-        inputAuth.name = 'auth';
-        inputAuth.value = '1';
-        form.appendChild(inputAuth);
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
-        showToast('已开始下载到本地，请留意浏览器下载栏', 'success');
-        document.getElementById('urlInput').value = '';
-    } else {
-        // Server mode: download to server, auto-transfer to local when done
-        const btn = document.getElementById('btnStart');
-        btn.disabled = true;
-        btn.textContent = '提交中...';
-        try {
-            const resp = await fetch('/api/download', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, format, concurrent: parseInt(concurrent) })
-            });
-            if (resp.status === 401) { showLogin(); return; }
-            const data = await resp.json();
-            if (data.error) {
-                showToast(data.error, 'error');
-            } else {
-                showToast('下载任务已创建', 'success');
-                document.getElementById('urlInput').value = '';
-                activeTasks.add(data.task_id);
-                autoDownloadTasks.add(data.task_id);
-                startPolling();
-                fetchTasks();
+    const btn = document.getElementById('btnStart');
+    btn.disabled = true;
+    btn.textContent = '提交中...';
+    try {
+        const resp = await fetch('/api/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, format, concurrent: parseInt(concurrent) })
+        });
+        if (resp.status === 401) { showLogin(); return; }
+        const data = await resp.json();
+        if (data.error) {
+            showToast(data.error, 'error');
+        } else {
+            showToast('下载任务已创建', 'success');
+            document.getElementById('urlInput').value = '';
+            activeTasks.add(data.task_id);
+            autoDownloadTasks.add(data.task_id);
+            startPolling();
+            fetchTasks();
             }
         } catch (e) {
             showToast('请求失败: ' + e.message, 'error');
