@@ -474,6 +474,30 @@ def run_douyin_download(task_id, url, options):
                 output_path.unlink()
             return
 
+        # ─── 如果选了仅音频(MP3), 用 ffmpeg 提取 ───
+        fmt = options.get('format', 'best')
+        if fmt == 'audio':
+            mp3_path = output_path.with_suffix('.mp3')
+            with tasks_lock:
+                task['status'] = 'merging'
+            try:
+                result = subprocess.run(
+                    ['ffmpeg', '-y', '-i', str(output_path), '-vn',
+                     '-acodec', 'libmp3lame', '-ab', '320k', str(mp3_path)],
+                    capture_output=True, text=True, timeout=300
+                )
+                if result.returncode == 0 and mp3_path.exists():
+                    output_path.unlink()  # 删除原mp4
+                    filename = mp3_path.name
+                    with tasks_lock:
+                        task['output_file'] = filename
+                else:
+                    with tasks_lock:
+                        task['error'] = f'音频提取失败, 保留视频文件'
+            except Exception as ae:
+                with tasks_lock:
+                    task['error'] = f'音频提取异常: {str(ae)}, 保留视频文件'
+
         with tasks_lock:
             task['status'] = 'completed'
             task['percent'] = 100.0
