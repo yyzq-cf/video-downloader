@@ -16,15 +16,45 @@ import threading
 import subprocess
 import time
 import mimetypes
+from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, request, jsonify, send_file, render_template, session
 from pathlib import Path
 
 import douyin_downloader
 
+# ─── 版本号(按日期+当日修改次数) ───
+_VERSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', '.version')
+_VERSION_DATE = (datetime.utcnow() + timedelta(hours=8)).strftime('%Y%m%d')
+
+def _get_version():
+    """获取版本号: vYYYYMMDD-N, 每次重启自动递增当日次数"""
+    try:
+        with open(_VERSION_FILE, 'r') as f:
+            v = f.read().strip()
+        if v.startswith(f'v{_VERSION_DATE}-'):
+            n = int(v.split('-')[1]) + 1
+        else:
+            n = 1
+    except:
+        n = 1
+    version = f'v{_VERSION_DATE}-{n}'
+    try:
+        with open(_VERSION_FILE, 'w') as f:
+            f.write(version)
+    except:
+        pass
+    return version
+
+VERSION = _get_version()
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.permanent_session_lifetime = 7 * 24 * 3600  # 7 days
+
+@app.context_processor
+def inject_version():
+    return {'version': VERSION}
 
 BASE_DIR = Path(__file__).resolve().parent
 DOWNLOAD_DIR = BASE_DIR / "downloads"

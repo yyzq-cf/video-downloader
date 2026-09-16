@@ -6,9 +6,14 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+env:
+  IMAGE_NAME: ywsj/video-downloader
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,13 +32,15 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ywsj/video-downloader
-          tags: |
-            type=raw,value=latest
-            type=sha,prefix=,format=short
-            type=semver,pattern=v{{version}}
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "tag=${TAG}" >> $GITHUB_OUTPUT
+            echo "version=${TAG}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "version=latest" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -41,7 +48,105 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.source=https://github.com/yyzq-cf/video-downloader
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # ─── 推送到 master(非tag)时自动创建版本tag + Release ───
+      - name: Generate version tag
+        if: github.ref == 'refs/heads/master'
+        id: version
+        run: |
+          # 日期+时间戳生成版本号 vYYYYMMDD-HHMMSS
+          VERSION="v$(TZ='Asia/Shanghai' date +'%Y%m%d-%H%M%S')"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Generated version: ${VERSION}"
+
+      - name: Create Git tag
+        if: github.ref == 'refs/heads/master'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.version.outputs.version }}
+          git push origin ${{ steps.version.outputs.version }}
+
+      - name: Build changelog from commits
+        if: github.ref == 'refs/heads/master'
+        id: changelog
+        run: |
+          # 获取上一个tag到现在的commit日志
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" --reverse HEAD~20..HEAD 2>/dev/null || git log --pretty=format:"- %s" --reverse)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" --reverse ${PREV_TAG}..HEAD)
+          fi
+          # 写入多行输出
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "changelog<<${EOF}" >> $GITHUB_OUTPUT
+          echo "${COMMITS}" >> $GITHUB_OUTPUT
+          echo "${EOF}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
+          body: |
+            ## 📋 更新日志
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ---
+
+            🐳 Docker 镜像: `ywsj/video-downloader:${{ steps.version.outputs.version }}`
+            📦 拉取最新版: `docker pull ywsj/video-downloader:latest`
+          draft: false
+          prerelease: false
+
+  # ─── tag 触发时也创建Release(如果tag是手动打的) ───
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build changelog from commits
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" --reverse HEAD~20..HEAD 2>/dev/null || git log --pretty=format:"- %s" --reverse)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" --reverse ${PREV_TAG}..HEAD)
+          fi
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "changelog<<${EOF}" >> $GITHUB_OUTPUT
+          echo "${COMMITS}" >> $GITHUB_OUTPUT
+          echo "${EOF}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: |
+            ## 📋 更新日志
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ---
+
+            🐳 Docker 镜像: `ywsj/video-downloader:${{ github.ref_name }}`
+            📦 拉取最新版: `docker pull ywsj/video-downloader:latest`
+          draft: false
+          prerelease: false

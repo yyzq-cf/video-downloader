@@ -106,7 +106,18 @@ video-downloader/
 └── README.md
 ```
 
-## 📋 更新日志
+## 📋 版本与更新日志
+
+本项目采用**日期版本号**格式：`vYYYYMMDD-N`（北京时间 UTC+8）
+
+- 每次容器重启时自动递增当日版本号
+- 每次 push 到 master 分支自动生成新版本 tag（`vYYYYMMDD-HHMMSS`）并创建 GitHub Release
+- Web 界面导航栏实时显示当前版本号
+- Docker Hub 同步推送对应版本 tag + `latest`
+
+查看所有版本：[Releases](https://github.com/yyzq-cf/video-downloader/releases)
+
+### 历史更新
 
 - **抖音无水印下载** — 专用 API 获取无水印视频，自动检测抖音链接，预览视频信息
 - **主题切换** — 默认亮色主题，支持暗色切换，`localStorage` 记住选择
