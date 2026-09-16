@@ -892,11 +892,7 @@ async function checkDouyinInfo(url) {
 async function startDownload() {
     const url = document.getElementById('urlInput').value.trim();
     if (!url) { showToast('请输入 URL', 'error'); return; }
-    // 抖音链接: 先预览视频信息
-    if (isDouyinUrl(url)) {
-        checkDouyinInfo(url);
-    }
-    // 默认下载到服务器
+    if (isDouyinUrl(url)) { checkDouyinInfo(url); }
     const format = document.getElementById('formatSelect').value;
     const concurrent = document.getElementById('concurrentSelect').value;
     const btn = document.getElementById('btnStart');
@@ -919,13 +915,12 @@ async function startDownload() {
             autoDownloadTasks.add(data.task_id);
             startPolling();
             fetchTasks();
-            }
-        } catch (e) {
-            showToast('请求失败: ' + e.message, 'error');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>下载';
         }
+    } catch (e) {
+        showToast('请求失败: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>下载';
     }
 }
 
