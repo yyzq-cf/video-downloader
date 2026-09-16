@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 需要完整历史用于生成changelog
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -30,43 +32,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-            echo "tag=${TAG}" >> $GITHUB_OUTPUT
-            echo "version=${TAG}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=latest" >> $GITHUB_OUTPUT
-            echo "version=latest" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
-            ${{ env.IMAGE_NAME }}:latest
-          labels: |
-            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
-            org.opencontainers.image.source=https://github.com/yyzq-cf/video-downloader
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # ─── 推送到 master(非tag)时自动创建版本tag + Release ───
-      - name: Generate version tag
-        if: github.ref == 'refs/heads/master'
+      # ─── 1. 生成版本号 ───
+      # push到master: 生成新tag vYYYYMMDD-N
+      # tag触发: 直接用tag名
+      - name: Generate version
         id: version
         run: |
-          # 日期+时间戳生成版本号 vYYYYMMDD-HHMMSS
-          VERSION="v$(TZ='Asia/Shanghai' date +'%Y%m%d-%H%M%S')"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            # 日期版本号 vYYYYMMDD-N, N为今日第几次提交(基于已有tag计数)
+            DATE=$(TZ='Asia/Shanghai' date +'%Y%m%d')
+            # 统计今天已有的tag数量
+            COUNT=$(git tag -l "v${DATE}-*" | wc -l)
+            N=$((COUNT + 1))
+            VERSION="v${DATE}-${N}"
+          fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Generated version: ${VERSION}"
+          echo "tag=${VERSION}" >> $GITHUB_OUTPUT
+          echo "📌 Version: ${VERSION}"
 
+      # ─── 2. push到master时先创建Git tag(在构建前) ───
       - name: Create Git tag
         if: github.ref == 'refs/heads/master'
         run: |
@@ -75,25 +61,41 @@ jobs:
           git tag ${{ steps.version.outputs.version }}
           git push origin ${{ steps.version.outputs.version }}
 
-      - name: Build changelog from commits
-        if: github.ref == 'refs/heads/master'
+      # ─── 3. 构建Docker镜像(注入版本号) ───
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}
+            ${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.source=https://github.com/yyzq-cf/video-downloader
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ─── 4. 生成changelog ───
+      - name: Build changelog
         id: changelog
         run: |
-          # 获取上一个tag到现在的commit日志
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          PREV_TAG=$(git describe --tags --abbrev=0 ${{ steps.version.outputs.version }}^ 2>/dev/null || echo "")
           if [ -z "$PREV_TAG" ]; then
             COMMITS=$(git log --pretty=format:"- %s" --reverse HEAD~20..HEAD 2>/dev/null || git log --pretty=format:"- %s" --reverse)
           else
-            COMMITS=$(git log --pretty=format:"- %s" --reverse ${PREV_TAG}..HEAD)
+            COMMITS=$(git log --pretty=format:"- %s" --reverse ${PREV_TAG}..${{ steps.version.outputs.version }})
           fi
-          # 写入多行输出
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
           echo "changelog<<${EOF}" >> $GITHUB_OUTPUT
           echo "${COMMITS}" >> $GITHUB_OUTPUT
           echo "${EOF}" >> $GITHUB_OUTPUT
 
+      # ─── 5. 创建GitHub Release ───
       - name: Create GitHub Release
-        if: github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.version }}
@@ -106,47 +108,6 @@ jobs:
             ---
 
             🐳 Docker 镜像: `ywsj/video-downloader:${{ steps.version.outputs.version }}`
-            📦 拉取最新版: `docker pull ywsj/video-downloader:latest`
-          draft: false
-          prerelease: false
-
-  # ─── tag 触发时也创建Release(如果tag是手动打的) ───
-  create-release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build changelog from commits
-        id: changelog
-        run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          if [ -z "$PREV_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"- %s" --reverse HEAD~20..HEAD 2>/dev/null || git log --pretty=format:"- %s" --reverse)
-          else
-            COMMITS=$(git log --pretty=format:"- %s" --reverse ${PREV_TAG}..HEAD)
-          fi
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "changelog<<${EOF}" >> $GITHUB_OUTPUT
-          echo "${COMMITS}" >> $GITHUB_OUTPUT
-          echo "${EOF}" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          body: |
-            ## 📋 更新日志
-
-            ${{ steps.changelog.outputs.changelog }}
-
-            ---
-
-            🐳 Docker 镜像: `ywsj/video-downloader:${{ github.ref_name }}`
             📦 拉取最新版: `docker pull ywsj/video-downloader:latest`
           draft: false
           prerelease: false

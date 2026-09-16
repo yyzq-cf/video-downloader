@@ -110,10 +110,11 @@ video-downloader/
 
 本项目采用**日期版本号**格式：`vYYYYMMDD-N`（北京时间 UTC+8）
 
-- 每次容器重启时自动递增当日版本号
-- 每次 push 到 master 分支自动生成新版本 tag（`vYYYYMMDD-HHMMSS`）并创建 GitHub Release
-- Web 界面导航栏实时显示当前版本号
+- 每次 push 到 master 分支自动生成新版本号（同一天多次 push 自动递增 N）
+- CI 构建时将版本号注入 Docker 镜像环境变量，Web 界面显示该版本
+- GitHub Release 自动记录更新日志（基于 commit messages）
 - Docker Hub 同步推送对应版本 tag + `latest`
+- **容器重启不会改变版本号**，只有代码更新才会
 
 查看所有版本：[Releases](https://github.com/yyzq-cf/video-downloader/releases)
 

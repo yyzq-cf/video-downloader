@@ -23,28 +23,15 @@ from pathlib import Path
 
 import douyin_downloader
 
-# ─── 版本号(按日期+当日修改次数) ───
-_VERSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', '.version')
-_VERSION_DATE = (datetime.utcnow() + timedelta(hours=8)).strftime('%Y%m%d')
-
+# ─── 版本号 ───
+# 优先读环境变量 APP_VERSION(CI构建时注入), 没有则本地开发用日期版本
 def _get_version():
-    """获取版本号: vYYYYMMDD-N, 每次重启自动递增当日次数"""
-    try:
-        with open(_VERSION_FILE, 'r') as f:
-            v = f.read().strip()
-        if v.startswith(f'v{_VERSION_DATE}-'):
-            n = int(v.split('-')[1]) + 1
-        else:
-            n = 1
-    except:
-        n = 1
-    version = f'v{_VERSION_DATE}-{n}'
-    try:
-        with open(_VERSION_FILE, 'w') as f:
-            f.write(version)
-    except:
-        pass
-    return version
+    """获取版本号: 优先用CI注入的APP_VERSION, 否则用本地开发日期版本"""
+    v = os.environ.get('APP_VERSION')
+    if v:
+        return v
+    # 本地开发环境: 用 git describe 或日期
+    return f'v{(datetime.utcnow() + timedelta(hours=8)).strftime("%Y%m%d")}-dev'
 
 VERSION = _get_version()
 

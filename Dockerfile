@@ -3,6 +3,10 @@ FROM python:3.12-slim
 LABEL maintainer="ywsj"
 LABEL description="ywsj Video Downloader - Web UI for yt-dlp with Cloudflare bypass and auth"
 
+# Version injected by CI (build-arg)
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
