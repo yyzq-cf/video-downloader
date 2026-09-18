@@ -2,7 +2,7 @@ services:
   video-downloader:
     image: ywsj/video-downloader:latest
     container_name: video-downloader
-    restart: unless-stopped
+    restart: always
     ports:
       - "5200:5200"
     volumes:
