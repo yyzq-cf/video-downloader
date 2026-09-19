@@ -350,7 +350,8 @@ def is_douyin_url(url):
 def build_ytdlp_cmd(url, options, output_template=None):
     """构建 yt-dlp 命令行"""
     if output_template is None:
-        output_template = str(DOWNLOAD_DIR / '%(title)s.%(ext)s')
+        # 文件名含视频ID, 避免同名/跨平台重复下载互相覆盖
+        output_template = str(DOWNLOAD_DIR / '%(title)s [%(id)s].%(ext)s')
 
     cmd = [
         'yt-dlp',
@@ -414,9 +415,9 @@ def run_douyin_download(task_id, url, options):
             task['error'] = info.get('error', '获取视频信息失败')
         return
 
-    # 构建文件名
+    # 构建文件名 (含aweme_id避免同名/重复下载覆盖)
     title = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', info['title']).strip()[:150]
-    filename = f"{title}.mp4"
+    filename = f"{title} [{aweme_id}].mp4"
     output_path = DOWNLOAD_DIR / filename
 
     with tasks_lock:
