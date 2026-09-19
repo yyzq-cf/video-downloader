@@ -349,9 +349,14 @@ def is_douyin_url(url):
 
 def build_ytdlp_cmd(url, options, output_template=None):
     """构建 yt-dlp 命令行"""
+    fmt = options.get('format', 'best')
     if output_template is None:
-        # 文件名含视频ID, 避免同名/跨平台重复下载互相覆盖
-        output_template = str(DOWNLOAD_DIR / '%(title)s [%(id)s].%(ext)s')
+        # 文件名含视频ID+格式后缀, 避免同名/跨平台重复下载互相覆盖
+        # MP3和MP4用不同后缀, 避免yt-dlp把已下载的mp3当成"已下载"跳过mp4下载
+        if fmt == 'audio':
+            output_template = str(DOWNLOAD_DIR / '%(title)s [%(id)s].mp3')
+        else:
+            output_template = str(DOWNLOAD_DIR / '%(title)s [%(id)s].mp4')
 
     cmd = [
         'yt-dlp',
@@ -361,6 +366,7 @@ def build_ytdlp_cmd(url, options, output_template=None):
         '--enable-file-urls',
         '--progress',
         '--continue',
+        '--no-overwrites',
         '--retries', '10',
         '--fragment-retries', '10',
         '--progress-template', 'P|%(progress._percent_str)s|%(progress._total_bytes_estimate_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress.fragment_index)s|%(progress.fragment_count)s',
@@ -368,7 +374,6 @@ def build_ytdlp_cmd(url, options, output_template=None):
     ]
 
     # 格式选择 — 优先选最佳视频+音频合并，回退到预合并单文件
-    fmt = options.get('format', 'best')
     if fmt == 'audio':
         cmd.extend(['-x', '--audio-format', 'mp3', '--audio-quality', '0'])
     elif fmt == '720p':
