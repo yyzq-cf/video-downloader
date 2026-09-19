@@ -111,3 +111,12 @@ jobs:
             📦 拉取最新版: `docker pull ywsj/video-downloader:latest`
           draft: false
           prerelease: false
+
+      # ─── 6. 同步 README 到 Docker Hub ───
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ywsj/video-downloader
+          readme-filepath: ./README.md
