@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ywsj Video Downloader - Web UI for yt-dlp
-基于 yt-dlp 的视频下载器，支持 Cloudflare 绕过、多线程下载、实时进度
+基于 yt-dlp 的视频下载器，支持 TLS 指纹伪装（绕过基础 Cloudflare 拦截）、多线程下载、实时进度
 """
 
 import os

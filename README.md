@@ -1,12 +1,12 @@
 # 🎬 ywsj Video Downloader
 
-基于 yt-dlp 的 Web 视频下载器，支持自动绕过 Cloudflare 验证、多线程下载、实时进度显示、流式直传本地、明暗主题切换。
+基于 yt-dlp 的 Web 视频下载器，支持 TLS 指纹伪装绕过基础 Cloudflare 拦截、多线程下载、实时进度显示、流式直传本地、明暗主题切换。
 
 ## ✨ 功能特性
 
 ### 下载能力
 - 🔗 **粘贴链接即下载** — 支持 yt-dlp 所有兼容站点（YouTube、B站、各类视频站等）
-- 🛡️ **自动绕过 Cloudflare** — 内置 `curl_cffi` 指纹模拟，突破 403 拦截
+- 🛡️ **TLS 指纹伪装** — 内置 `curl_cffi` 模拟 Chrome 指纹，可绕过 Cloudflare Bot Fight Mode 等 TLS 层 403 拦截（不支持 JS 质询/Turnstile）
 - ⚡ **多线程并发** — 支持 5-20 线程同时下载分片，速度拉满
 - 🎵 **分离流自动合并** — 智能选择 `bestvideo+bestaudio` 方案，支持 m3u8/HLS 等只有分离流的源
 - 🎬 **画质选择** — 最高画质 / 1080p / 720p / 仅音频(MP3)
@@ -75,7 +75,7 @@ python app.py
 | **Flask** | Web 后端框架 |
 | **gunicorn** | 生产级 WSGI 服务器（单 worker 多线程） |
 | **yt-dlp** | 视频下载核心引擎 |
-| **curl_cffi** | Cloudflare 指纹绕过 / 抖音API请求 |
+| **curl_cffi** | TLS 指纹伪装（绕过基础 Cloudflare 拦截）/ 抖音API请求 |
 | **douyin_downloader** | 抖音无水印视频下载模块 |
 | **ffmpeg** | 视频合并/转码 |
 | **原生 JS** | 前端，无框架依赖 |
