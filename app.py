@@ -351,12 +351,16 @@ def build_ytdlp_cmd(url, options, output_template=None):
     """构建 yt-dlp 命令行"""
     fmt = options.get('format', 'best')
     if output_template is None:
-        # 文件名含视频ID+格式后缀, 避免同名/跨平台重复下载互相覆盖
-        # MP3和MP4用不同后缀, 避免yt-dlp把已下载的mp3当成"已下载"跳过mp4下载
+        # 文件名含视频ID+画质标签+格式后缀, 避免不同画质/格式互相覆盖或被yt-dlp跳过
         if fmt == 'audio':
-            output_template = str(DOWNLOAD_DIR / '%(title)s [%(id)s].mp3')
+            ext, tag = 'mp3', 'MP3'
+        elif fmt == '1080p':
+            ext, tag = 'mp4', '1080p'
+        elif fmt == '720p':
+            ext, tag = 'mp4', '720p'
         else:
-            output_template = str(DOWNLOAD_DIR / '%(title)s [%(id)s].mp4')
+            ext, tag = 'mp4', 'BEST'
+        output_template = str(DOWNLOAD_DIR / f'%(title)s [%(id)s][{tag}].{ext}')
 
     cmd = [
         'yt-dlp',
