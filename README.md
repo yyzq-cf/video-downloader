@@ -136,6 +136,12 @@ video-downloader/
 
 如版权方认为本工具涉及侵权，请通过 [Issues](https://github.com/yyzq-cf/video-downloader/issues) 联系。
 
+## ☕ 请作者喝杯咖啡
+
+如果这个项目对你有帮助，欢迎请作者喝杯咖啡 ☕️
+
+![打赏码](assets/donation.jpg)
+
 ## License
 
 MIT
