@@ -1250,6 +1250,26 @@ def delete_file(filename):
     return jsonify({'status': 'deleted'})
 
 
+@app.route('/api/files/batch-delete', methods=['POST'])
+@login_required
+def batch_delete_files():
+    data = request.json or {}
+    filenames = data.get('filenames', [])
+    if not filenames:
+        return jsonify({'error': '没有选择任何文件'}), 400
+    
+    deleted = []
+    for filename in filenames:
+        # 简单安全检查防止目录穿越
+        if '..' in filename or filename.startswith('/'):
+            continue
+        filepath = DOWNLOAD_DIR / filename
+        if filepath.exists() and filepath.is_file():
+            filepath.unlink()
+            deleted.append(filename)
+    return jsonify({'status': 'ok', 'deleted_count': len(deleted), 'deleted': deleted})
+
+
 
 
 @app.route('/api/stream-download', methods=['POST'])

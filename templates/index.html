@@ -670,7 +670,16 @@
         </div>
 
         <div id="taskListPanel" class="task-list"></div>
-        <div id="fileListPanel" class="file-list" style="display:none;"></div>
+        <div id="fileListContainer" style="display:none;">
+            <div class="file-toolbar" style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem;background:var(--card);padding:0.6rem 1rem;border-radius:10px;border:1px solid var(--border);">
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.9rem;font-weight:500;">
+                    <input type="checkbox" id="selectAllFiles" onclick="toggleSelectAllFiles(this)"> 全选文件
+                </label>
+                <span id="selectedCount" style="color:var(--text-secondary);font-size:0.85rem;">已选 0 个</span>
+                <button class="task-btn danger" onclick="batchDeleteFiles()" style="margin-left:auto;">🗑 批量删除选中</button>
+            </div>
+            <div id="fileListPanel" class="file-list"></div>
+        </div>
 
         <!-- Supported Sites -->
         <div class="sites-card">
@@ -1041,6 +1050,8 @@ async function fetchFiles() {
     const container = document.getElementById('fileListPanel');
     if (files.length === 0) {
         container.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg><p>暂无已下载文件</p></div>`;
+        document.getElementById('fileCount').textContent = 0;
+        document.getElementById('totalSize').textContent = '0 B';
         return;
     }
     container.innerHTML = files.map(f => {
@@ -1050,11 +1061,69 @@ async function fetchFiles() {
         const icon = isVideo ? '🎬' : isAudio ? '🎵' : '📄';
         const date = new Date(f.modified * 1000);
         const dateStr = `${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2,'0')}`;
-        return `<div class="file-item"><div class="file-info"><div class="file-name">${icon} ${f.name}</div><div class="file-meta">${f.size}  ·  ${dateStr}</div></div><div class="file-actions">${(isVideo||isAudio) ? `<button class="btn-icon" onclick="playFile('${encodeURIComponent(f.name)}')" title="播放"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>` : ''}<button class="btn-icon" onclick="downloadFile('${encodeURIComponent(f.name)}')" title="下载到本地"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button><button class="btn-icon danger" onclick="deleteFile('${encodeURIComponent(f.name)}')" title="删除"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></div></div>`;
+        return `<div class="file-item">
+            <input type="checkbox" class="file-checkbox" value="${escapeHtml(f.name)}" onclick="updateSelectedCount()" style="width:18px;height:18px;cursor:pointer;">
+            <div class="file-info"><div class="file-name">${icon} ${f.name}</div><div class="file-meta">${f.size}  ·  ${dateStr}</div></div>
+            <div class="file-actions">
+                ${(isVideo||isAudio) ? `<button class="btn-icon" onclick="playFile('${encodeURIComponent(f.name)}')" title="播放"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>` : ''}
+                <button class="btn-icon" onclick="downloadFile('${encodeURIComponent(f.name)}')" title="下载到本地"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></button>
+                <button class="btn-icon danger" onclick="deleteFile('${encodeURIComponent(f.name)}')" title="删除"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+            </div>
+        </div>`;
     }).join('');
     document.getElementById('fileCount').textContent = files.length;
     const total = files.reduce((sum, f) => sum + (f.size_bytes || 0), 0);
     document.getElementById('totalSize').textContent = formatSize(total);
+    document.getElementById('selectAllFiles').checked = false;
+    updateSelectedCount();
+}
+
+function toggleSelectAllFiles(master) {
+    const checkboxes = document.querySelectorAll('.file-checkbox');
+    checkboxes.forEach(cb => cb.checked = master.checked);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const checked = document.querySelectorAll('.file-checkbox:checked');
+    const total = document.querySelectorAll('.file-checkbox');
+    document.getElementById('selectedCount').textContent = `已选 ${checked.length} 个`;
+    if (total.length > 0 && checked.length === total.length) {
+        document.getElementById('selectAllFiles').checked = true;
+    } else {
+        document.getElementById('selectAllFiles').checked = false;
+    }
+}
+
+async function batchDeleteFiles() {
+    const checked = document.querySelectorAll('.file-checkbox:checked');
+    if (checked.length === 0) {
+        showToast('请先勾选要删除的文件', 'error');
+        return;
+    }
+    if (!confirm(`确定要删除选中的 ${checked.length} 个文件吗？`)) return;
+
+    const filenames = Array.from(checked).map(cb => cb.value);
+    try {
+        const resp = await fetch('/api/files/batch-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filenames })
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            showToast(`成功删除 ${data.deleted_count} 个文件`, 'success');
+            fetchFiles();
+        } else {
+            showToast(data.error || '删除失败', 'error');
+        }
+    } catch(e) {
+        showToast('网络请求失败', 'error');
+    }
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
 function formatSize(bytes) {
@@ -1090,7 +1159,7 @@ function switchTab(tab) {
     document.getElementById('tabTasks').classList.toggle('active', tab === 'tasks');
     document.getElementById('tabFiles').classList.toggle('active', tab === 'files');
     document.getElementById('taskListPanel').style.display = tab === 'tasks' ? 'flex' : 'none';
-    document.getElementById('fileListPanel').style.display = tab === 'files' ? 'flex' : 'none';
+    document.getElementById('fileListContainer').style.display = tab === 'files' ? 'block' : 'none';
     if (tab === 'files') fetchFiles();
 }
 
