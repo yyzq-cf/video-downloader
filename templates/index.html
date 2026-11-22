@@ -795,14 +795,19 @@ async function checkYtdlpVersion() {
         const resp = await fetch('/api/ytdlp/version');
         const data = await resp.json();
         if (data.latest && data.latest !== data.current) {
-            // 有新版: 橙色高亮提示
+            // 有新版: 橙色高亮提示, 同时显示两个版本方便对比
             badge.textContent = `🎬 yt-dlp ${data.current} → ${data.latest} ⬆️`;
+            badge.classList.remove('nav-ytdlp');
             badge.classList.add('nav-ytdlp-update');
             badge.title = `当前 ${data.current}，官方最新 ${data.latest}（点击升级提示）`;
             badge.onclick = () => showToast(`检测到新版 yt-dlp ${data.latest}（当前 ${data.current}）\n升级: docker pull + 重建容器`, 'info', 6000);
         } else if (data.latest) {
-            badge.textContent = `🎬 yt-dlp ${data.current} ✓`;
-            badge.title = `已是官方最新版 ${data.latest}`;
+            // 已是最新: 同时显示两个版本, 方便对比确认
+            badge.textContent = `🎬 yt-dlp ${data.current} / 最新 ${data.latest}`;
+            badge.classList.remove('nav-ytdlp-update');
+            badge.classList.add('nav-ytdlp');
+            badge.title = `当前 ${data.current} = 官方最新 ${data.latest}，已是最新`;
+            badge.onclick = null;
         }
     } catch(e) {
         // 网络失败保持默认显示
