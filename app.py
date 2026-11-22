@@ -412,6 +412,7 @@ def build_ytdlp_cmd(url, options, output_template=None):
         'yt-dlp',
         '--no-check-certificates',
         '--extractor-args', 'generic:impersonate',
+        '--remote-components', 'ejs:github',
         '--newline',
         '--enable-file-urls',
         '--progress',
@@ -1444,6 +1445,7 @@ def stream_download():
         'yt-dlp',
         '--no-check-certificates',
         '--extractor-args', 'generic:impersonate',
+        '--remote-components', 'ejs:github',
         '--concurrent-fragments', str(int(data.get('concurrent', 10))),
         '--throttled-rate', '100K',
         '--retries', '10',
@@ -1471,7 +1473,8 @@ def stream_download():
     content_length = None
     try:
         info_proc = subprocess.run(
-            ['yt-dlp', '--no-check-certificates', '--extractor-args', 'generic:impersonate', '-J', url] + get_cookies_arg(),
+            ['yt-dlp', '--no-check-certificates', '--extractor-args', 'generic:impersonate',
+             '--remote-components', 'ejs:github', '-J', url] + get_cookies_arg(),
             capture_output=True, text=True, timeout=60, cwd=str(DOWNLOAD_DIR)
         )
         if info_proc.stdout:
