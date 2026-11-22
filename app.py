@@ -45,6 +45,32 @@ except Exception:
     except Exception:
         YTDLP_VERSION = 'unknown'
 
+# ─── yt-dlp 官方最新版本查询 (PyPI, 带缓存防拖慢) ───
+_ytdlp_latest_cache = {'ts': 0.0, 'version': None, 'error': None}
+_LATEST_TTL = 3600  # 1 小时
+
+
+def get_ytdlp_latest_version():
+    """查询 PyPI 上 yt-dlp 官方最新版本 (1 小时缓存, 失败时返回缓存或 None)"""
+    now = time.time()
+    if now - _ytdlp_latest_cache['ts'] < _LATEST_TTL:
+        return _ytdlp_latest_cache['version'], _ytdlp_latest_cache['error']
+
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            'https://pypi.org/pypi/yt-dlp/json',
+            headers={'User-Agent': 'ywsj-video-downloader/1.0'},
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+        version = data.get('info', {}).get('version')
+        _ytdlp_latest_cache.update(ts=now, version=version, error=None)
+        return version, None
+    except Exception as e:
+        _ytdlp_latest_cache.update(ts=now, version=_ytdlp_latest_cache['version'], error=str(e))
+        return _ytdlp_latest_cache['version'], str(e)
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.permanent_session_lifetime = 7 * 24 * 3600  # 7 days
@@ -940,6 +966,18 @@ def auth_check():
     if 'username' in session:
         return jsonify({'logged_in': True, 'username': session['username']})
     return jsonify({'logged_in': False}), 401
+
+
+@app.route('/api/ytdlp/version')
+def ytdlp_version_api():
+    """当前 yt-dlp 版本 + 官方最新版本 (PyPI)"""
+    latest, error = get_ytdlp_latest_version()
+    return jsonify({
+        'current': YTDLP_VERSION,
+        'latest': latest,
+        'outdated': bool(latest and latest != YTDLP_VERSION),
+        'error': error,
+    })
 
 
 @app.route('/api/change-password', methods=['POST'])
