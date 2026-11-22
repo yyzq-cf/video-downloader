@@ -11,7 +11,13 @@ ENV APP_VERSION=${APP_VERSION}
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Deno (yt-dlp YouTube 提取需要 JS 运行时, 否则部分格式缺失)
+# 见 https://github.com/yt-dlp/yt-dlp/wiki/EJS
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh -s -- \
+    && deno --version
 
 # Install Python dependencies
 RUN pip install --no-cache-dir \
