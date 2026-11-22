@@ -476,6 +476,7 @@
             transition: all 0.2s;
         }
         .btn-account:hover { background: var(--accent-hover); }
+        .btn-account-danger:hover { background: #dc2626; }
         .btn-logout {
             width: 100%;
             background: transparent;
@@ -745,6 +746,19 @@
             <div class="account-field"><input type="password" id="newPassword" placeholder="新密码 (至少6位)"></div>
             <button class="btn-account" onclick="doChangePassword()">修改密码</button>
         </div>
+        <div class="account-section">
+            <h3>🍪 YouTube Cookies（可选）</h3>
+            <p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.6rem;">
+                YouTube 下载遇到 <code>Sign in to confirm you're not a bot</code> 时，上传浏览器的 cookies 即可解决。
+                用浏览器插件（如 <a href="https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener">Get cookies.txt LOCALLY</a>）从 YouTube 导出，然后上传。
+            </p>
+            <div class="account-field"><input type="file" id="cookiesFile" accept=".txt" style="padding:0.4rem;"></div>
+            <div style="display:flex;gap:0.5rem;">
+                <button class="btn-account" onclick="uploadCookies()">上传 cookies</button>
+                <button class="btn-account btn-account-danger" id="btnDeleteCookies" onclick="deleteCookies()" style="display:none;background:var(--danger,#ef4444);">删除 cookies</button>
+            </div>
+            <div id="cookiesStatus" style="font-size:0.8rem;margin-top:0.6rem;color:var(--text-secondary);"></div>
+        </div>
         <button class="btn-logout" onclick="doLogout()">退出登录</button>
     </div>
 </div>
@@ -826,10 +840,85 @@ async function doLogout() {
 
 function showAccountModal() {
     document.getElementById('accountModal').classList.add('active');
+    loadCookiesStatus();
 }
 function closeAccountModal(e) {
     if (e && e.target !== e.currentTarget) return;
     document.getElementById('accountModal').classList.remove('active');
+}
+
+// === Cookies (YouTube 反爬绕过) ===
+async function loadCookiesStatus() {
+    const statusEl = document.getElementById('cookiesStatus');
+    const delBtn = document.getElementById('btnDeleteCookies');
+    try {
+        const resp = await fetch('/api/cookies');
+        const data = await resp.json();
+        if (data.enabled) {
+            const domains = Object.keys(data.domains || {}).slice(0, 5).join(', ');
+            statusEl.innerHTML = '✅ 已启用 cookies';
+            if (domains) statusEl.innerHTML += `（<span style="color:var(--text-secondary)">${domains}${Object.keys(data.domains||{}).length>5?'...':''}</span> ${Object.keys(data.domains||{}).length} 个域名）`;
+            statusEl.style.color = 'var(--success, #22c55e)';
+            if (delBtn) delBtn.style.display = '';
+        } else {
+            statusEl.textContent = '未配置 cookies';
+            statusEl.style.color = '';
+            if (delBtn) delBtn.style.display = 'none';
+        }
+    } catch(e) {
+        statusEl.textContent = '获取状态失败';
+    }
+}
+
+async function uploadCookies() {
+    const fileInput = document.getElementById('cookiesFile');
+    const statusEl = document.getElementById('cookiesStatus');
+    if (!fileInput.files || !fileInput.files[0]) {
+        statusEl.textContent = '请先选择 cookies.txt 文件';
+        statusEl.style.color = 'var(--error)';
+        return;
+    }
+    const fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+    statusEl.textContent = '上传中...';
+    statusEl.style.color = '';
+    try {
+        const resp = await fetch('/api/cookies', { method: 'POST', body: fd });
+        const data = await resp.json();
+        if (resp.ok && data.status === 'ok') {
+            const domains = Object.keys(data.domains || {}).slice(0, 5).join(', ');
+            statusEl.innerHTML = `✅ cookies 上传成功（${Object.keys(data.domains||{}).length} 个域名: ${domains}）`;
+            statusEl.style.color = 'var(--success, #22c55e)';
+            document.getElementById('btnDeleteCookies').style.display = '';
+            fileInput.value = '';
+        } else {
+            statusEl.textContent = data.error || '上传失败';
+            statusEl.style.color = 'var(--error)';
+        }
+    } catch(e) {
+        statusEl.textContent = '上传失败: ' + e;
+        statusEl.style.color = 'var(--error)';
+    }
+}
+
+async function deleteCookies() {
+    const statusEl = document.getElementById('cookiesStatus');
+    if (!confirm('确认删除已上传的 cookies？')) return;
+    try {
+        const resp = await fetch('/api/cookies', { method: 'DELETE' });
+        const data = await resp.json();
+        if (resp.ok && data.status === 'ok') {
+            statusEl.textContent = 'cookies 已删除';
+            statusEl.style.color = '';
+            document.getElementById('btnDeleteCookies').style.display = 'none';
+        } else {
+            statusEl.textContent = data.error || '删除失败';
+            statusEl.style.color = 'var(--error)';
+        }
+    } catch(e) {
+        statusEl.textContent = '删除失败: ' + e;
+        statusEl.style.color = 'var(--error)';
+    }
 }
 
 async function doChangePassword() {

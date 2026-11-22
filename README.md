@@ -11,6 +11,7 @@
 - 🎵 **分离流自动合并** — 智能选择 `bestvideo+bestaudio` 方案，支持 m3u8/HLS 等只有分离流的源
 - 🎬 **画质选择** — 最高画质 / 1080p / 720p / 仅音频(MP3)
 - 🎵 **抖音无水印下载** — 专用 API 获取无水印视频，不走 yt-dlp，无需登录
+- 🍪 **YouTube Cookies 支持** — 遇到 `Sign in to confirm you're not a bot` 时，在「账户管理」上传浏览器导出的 cookies.txt 即可稳定下载（B站等登录态网站同样适用）
 
 ### 下载与保存
 - 🖥️ **存服务器模式** — 视频下载到服务器硬盘，完成后自动触发浏览器下载，也可在「已下载文件」中在线播放或手动保存
@@ -62,6 +63,18 @@ python app.py
 4. 点击「下载」按钮
 5. 在「下载队列」查看实时进度（进度条显示百分比）
 6. 下载完成后自动触发浏览器下载；也可在「已下载文件」中在线播放或手动保存
+
+### 🍪 YouTube 下载失败（Sign in to confirm you're not a bot）怎么办
+
+YouTube 近年加强反爬，匿名下载经常触发验证。解决方案：
+
+1. 用浏览器访问 [youtube.com](https://www.youtube.com) 并登录
+2. 安装插件 **Get cookies.txt LOCALLY**（[Chrome 商店](https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)）
+3. 在 YouTube 页面点击插件 → **Export**，得到 `cookies.txt`
+4. 打开本面板 **⚙ 账户** → **YouTube Cookies** → 上传 `cookies.txt`
+5. 之后所有下载自动带上 cookies（保存在 `data/cookies.txt`，删除即复原）
+
+> cookies 只会被 yt-dlp 用于下载请求，不会上传到任何第三方。B站等需要登录态的站点同样支持。
 
 ## 🛠️ 技术栈
 

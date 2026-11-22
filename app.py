@@ -49,6 +49,16 @@ DOWNLOAD_DIR.mkdir(exist_ok=True)
 DB_PATH = BASE_DIR / "data" / "users.db"
 DB_PATH.parent.mkdir(exist_ok=True)
 
+# cookies.txt 路径 (持久化在 data/ 挂载目录)
+COOKIES_PATH = BASE_DIR / "data" / "cookies.txt"
+
+
+def get_cookies_arg():
+    """返回 yt-dlp --cookies 参数列表。存在 cookies 文件则返回 ['--cookies', path]，否则 []"""
+    if COOKIES_PATH.exists() and COOKIES_PATH.stat().st_size > 0:
+        return ['--cookies', str(COOKIES_PATH)]
+    return []
+
 # 存储下载任务状态
 tasks = {}
 tasks_lock = threading.Lock()
@@ -376,6 +386,9 @@ def build_ytdlp_cmd(url, options, output_template=None):
         '--progress-template', 'P|%(progress._percent_str)s|%(progress._total_bytes_estimate_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress.fragment_index)s|%(progress.fragment_count)s',
         '-o', output_template,
     ]
+
+    # 存在 cookies.txt 则带上 (YouTube/B站登录态/反爬绕过)
+    cmd.extend(get_cookies_arg())
 
     # 格式选择 — 优先选最佳视频+音频合并，回退到预合并单文件
     if fmt == 'audio':
@@ -954,6 +967,94 @@ def change_un():
     return jsonify({'error': '密码错误或用户名已存在'}), 400
 
 
+@app.route('/api/cookies', methods=['GET'])
+@login_required
+def cookies_status():
+    """查询 cookies 状态"""
+    exists = COOKIES_PATH.exists() and COOKIES_PATH.stat().st_size > 0
+    info = {}
+    if exists:
+        try:
+            with open(COOKIES_PATH, 'r', encoding='utf-8', errors='ignore') as f:
+                for line in f:
+                    if line.startswith('#') or not line.strip():
+                        continue
+                    parts = line.strip().split('\t')
+                    if len(parts) >= 7:
+                        info.setdefault(parts[0], 0)
+                        info[parts[0]] += 1
+        except Exception:
+            pass
+    return jsonify({
+        'enabled': exists,
+        'domains': info if exists else {},
+    })
+
+
+@app.route('/api/cookies', methods=['POST'])
+@login_required
+def cookies_upload():
+    """上传 cookies.txt (Netscape 格式)"""
+    f = request.files.get('file')
+    if not f:
+        return jsonify({'error': '没有收到文件'}), 400
+
+    # 安全校验: 文件名必须是 cookies.txt 或常规文件名
+    filename = f.filename or ''
+    if not filename.lower().endswith('.txt'):
+        return jsonify({'error': '请上传 .txt 格式的 cookies 文件'}), 400
+
+    content = f.read()
+    if len(content) > 2 * 1024 * 1024:
+        return jsonify({'error': 'cookies 文件过大 (最大 2MB)'}), 400
+
+    try:
+        text = content.decode('utf-8', errors='ignore')
+    except Exception:
+        return jsonify({'error': '无法读取文件内容'}), 400
+
+    # 简单校验 Netscape cookies 格式
+    if '# Netscape HTTP Cookie File' not in text and '# HTTP Cookie File' not in text:
+        # 没有头也可以, 检查有没有 tab 分隔的 cookie 行
+        has_cookie_line = any(
+            len(line.strip().split('\t')) >= 7
+            for line in text.splitlines()
+            if line.strip() and not line.startswith('#')
+        )
+        if not has_cookie_line:
+            return jsonify({'error': 'cookies 格式不正确 (需要 Netscape 格式, 请用浏览器插件导出)'}), 400
+
+    # 写入持久化目录
+    try:
+        COOKIES_PATH.write_bytes(content)
+    except Exception as e:
+        return jsonify({'error': f'写入失败: {str(e)}'}), 500
+
+    # 统计域名
+    domains = {}
+    for line in text.splitlines():
+        if line.startswith('#') or not line.strip():
+            continue
+        parts = line.strip().split('\t')
+        if len(parts) >= 7:
+            domains.setdefault(parts[0], 0)
+            domains[parts[0]] += 1
+
+    return jsonify({'status': 'ok', 'domains': domains})
+
+
+@app.route('/api/cookies', methods=['DELETE'])
+@login_required
+def cookies_delete():
+    """删除 cookies 文件"""
+    try:
+        if COOKIES_PATH.exists():
+            COOKIES_PATH.unlink()
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'error': f'删除失败: {str(e)}'}), 500
+
+
 @app.route('/api/douyin/info', methods=['POST'])
 @login_required
 def douyin_info():
@@ -1302,6 +1403,7 @@ def stream_download():
         '-o', '-',
         '--no-part',
     ]
+    cmd.extend(get_cookies_arg())
     if fmt == 'audio':
         cmd.extend(['-x', '--audio-format', 'mp3', '--audio-quality', '0'])
         ext = 'mp3'
@@ -1321,7 +1423,7 @@ def stream_download():
     content_length = None
     try:
         info_proc = subprocess.run(
-            ['yt-dlp', '--no-check-certificates', '--extractor-args', 'generic:impersonate', '-J', url],
+            ['yt-dlp', '--no-check-certificates', '--extractor-args', 'generic:impersonate', '-J', url] + get_cookies_arg(),
             capture_output=True, text=True, timeout=60, cwd=str(DOWNLOAD_DIR)
         )
         if info_proc.stdout:
