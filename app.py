@@ -35,13 +35,23 @@ def _get_version():
 
 VERSION = _get_version()
 
+try:
+    from importlib.metadata import version as _pkg_version
+    YTDLP_VERSION = _pkg_version('yt-dlp')
+except Exception:
+    try:
+        import yt_dlp
+        YTDLP_VERSION = getattr(getattr(yt_dlp, 'version', None), '__version__', 'unknown')
+    except Exception:
+        YTDLP_VERSION = 'unknown'
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.permanent_session_lifetime = 7 * 24 * 3600  # 7 days
 
 @app.context_processor
 def inject_version():
-    return {'version': VERSION}
+    return {'version': VERSION, 'ytdlp_version': YTDLP_VERSION}
 
 BASE_DIR = Path(__file__).resolve().parent
 DOWNLOAD_DIR = BASE_DIR / "downloads"
